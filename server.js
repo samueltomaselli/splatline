@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT) || 8080;
 const MAX_PEERS = Number(process.env.MAX_PEERS) || 24;
 const MAX_PRESENCE_BYTES = 4096;
 const MAX_EVENT_BYTES = 4096;
-const TOPICS = new Set(['shot', 'out', 'nade', 'boom']);
+const TOPICS = new Set(['shot', 'hit', 'out', 'nade', 'boom']);
 
 const INDEX = path.join(__dirname, 'public', 'index.html');
 
@@ -36,9 +36,12 @@ const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
 /** @type {Map<string, {ws: import('ws'), presence: object, tokens: number, last: number, alive: boolean}>} */
 const peers = new Map();
 
+// LAG_MS: atraso artificial só para testes locais (padrão 0)
+const LAG_MS = Number(process.env.LAG_MS) || 0;
 function broadcast(msg, exceptId) {
   const data = JSON.stringify(msg);
-  for (const [id, p] of peers) if (id !== exceptId && p.ws.readyState === 1) p.ws.send(data);
+  const send = () => { for (const [id, p] of peers) if (id !== exceptId && p.ws.readyState === 1) p.ws.send(data); };
+  if (LAG_MS) setTimeout(send, LAG_MS); else send();
 }
 const isPlainObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 

@@ -229,6 +229,7 @@ const V3 = THREE.Vector3;
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const FIELD = { hw: 18, hl: 22.5 };
+const HIT_PAD = 0.06;
 const G = 9.81, BALL_SPEED = 90, DRAG = 0.0035, BREAK_CHANCE = 0.86;
 const WIN_POINTS = 4, ROUND_TIME = 120;
 
@@ -608,10 +609,16 @@ function updateBalls(dt) {
     if (wh) best = { t: wh.distance / p0.distanceTo(p1), kind: 'world', point: wh.point, normal: wh.face.normal.clone().transformDirection(wh.object.matrixWorld) };
     for (const a of actors) {
       if (!a.alive || a.team === B.team || (a.spawnUntil && now() < a.spawnUntil)) continue;
-      if (S.mode === 'online' && !a.auth) continue; // cada um decide se foi acertado
+      if (S.mode === 'online') {
+        // quem atira decide: a bola de outro jogador aqui é só visual,
+        // e as minhas bolas acertam os outros onde eu os vejo
+        if (B.remote || a.auth) continue;
+        if (!a.remote || a.shield || (a.pendingOut || 0) > now()) continue;
+      }
       if (Math.abs(a.pos.x - p0.x) > 60 && Math.abs(a.pos.z - p0.z) > 60) continue;
+      const pad = a.remote ? HIT_PAD : 0;
       for (const v of a.volumes()) {
-        const t = segSphere(p0, p1, v, v.r);
+        const t = segSphere(p0, p1, v, v.r + pad);
         if (t !== null && (!best || t < best.t)) best = { t, kind: 'actor', actor: a, part: v.part, point: p0.clone().lerp(p1, t), vol: v };
       }
     }
@@ -878,6 +885,15 @@ function eliminate(a, by, part) {
 function onActorHit(a, B, part, point, vol) {
   const by = B.owner;
   if (by.isPlayer) { S.stats.hits++; hitMarker(); sfx.hit(); }
+  if (S.mode === 'online' && a.remote) {
+    if (Math.random() >= BREAK_CHANCE) { if (by.isPlayer) toast('Bounce — a bola bateu e não quebrou.'); return; }
+    const n = point.clone().sub(new V3(vol.x, vol.y, vol.z)).normalize();
+    const d = addDecal(point, n, TEAMS[B.team].paint, part === 'head' ? 0.22 : 0.3, a.body.root); d.userData.paint = true;
+    sfx.splat(point);
+    a.pendingOut = now() + 1.2; // não conta de novo enquanto a vítima confirma
+    net.emitHit(a, by, part, point);
+    return;
+  }
   const brk = Math.random() < BREAK_CHANCE;
   if (a.body) {
     const n = point.clone().sub(new V3(vol.x, vol.y, vol.z)).normalize();
@@ -1557,12 +1573,12 @@ const net = {
   sendPresence(force) {
     if (!this.room || !this.joined) return;
     const t = performance.now();
-    if (!force && t - this.lastPresence < 50) return;
+    if (!force && t - this.lastPresence < 33) return;
     this.lastPresence = t;
     const p = player;
     const patch = {
       n: this.name, t: p.team,
-      s: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), r2(p.crouch), p.alive ? 1 : 0, S.stats.elims, S.stats.outs, p.spawnUntil > now() ? 1 : 0, Math.floor(performance.now() / 250) % 100000],
+      s: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), r2(p.crouch), p.alive ? 1 : 0, S.stats.elims, S.stats.outs, p.spawnUntil > now() ? 1 : 0, Math.floor(performance.now() / 250) % 100000, r2(p.vel.x), r2(p.vel.z)],
       away: document.hidden ? 1 : null,
       r: this.host ? [this.round.n, this.round.ph, Math.round(Math.max(0, this.round.end - performance.now())), this.round.A, this.round.B, this.round.win || ''] : null,
       b: false && this.host ? this.bots.map(b => [b.botId, b.team, b.name, r2(b.pos.x), r2(b.pos.y), r2(b.pos.z), r2(b.yaw), r2(b.pitch), r2(b.crouch), b.alive ? 1 : 0, b.kills || 0]) : null,
@@ -1571,7 +1587,7 @@ const net = {
   },
   flushShots() {
     const t = performance.now();
-    if (!this.room || !this.shots.length || t - this.lastFlush < 100) return;
+    if (!this.room || !this.shots.length) return;
     this.lastFlush = t;
     while (this.shots.length) this.room.emit('shot', { s: this.shots.splice(0, 40) }).catch(() => {});
   },
@@ -1587,6 +1603,8 @@ const net = {
       this.remotes.set(key, a); actors.push(a);
     }
     a.name = name; a.kills = st.k; a.deaths = st.d; a.seen = true;
+    if (!a.tVel) a.tVel = new V3();
+    if (st.raw !== a.lastRaw) { a.lastRaw = st.raw; a.tAt = performance.now(); a.tVel.set(st.vx || 0, 0, st.vz || 0); }
     a.target.set(st.x, st.y, st.z); a.tYaw = st.yaw; a.tPitch = st.pitch; a.tCrouch = st.crouch; a.shield = st.shield;
     if (st.alive && !a.alive && performance.now() > (a.deadLock || 0)) { // voltou (respawn)
       a.alive = true; a.pos.copy(a.target); a.yaw = a.tYaw; a.outAt = 0;
@@ -1607,7 +1625,7 @@ const net = {
         else if (performance.now() - prev.at > 3000) continue; // travado: aba pausada ou conexão ruim
       }
       if (s && s.length >= 9 && s.slice(0, 6).every(Number.isFinite)) {
-        this.upsertRemote(p.peer, pr.t, cleanName(pr.n) || 'JOGADOR', { x: s[0], y: s[1], z: s[2], yaw: s[3], pitch: s[4], crouch: clamp(s[5], 0, 1), alive: !!s[6], k: s[7] | 0, d: s[8] | 0, shield: !!s[9] }, false);
+        this.upsertRemote(p.peer, pr.t, cleanName(pr.n) || 'JOGADOR', { x: s[0], y: s[1], z: s[2], yaw: s[3], pitch: s[4], crouch: clamp(s[5], 0, 1), alive: !!s[6], k: s[7] | 0, d: s[8] | 0, shield: !!s[9], vx: Number.isFinite(s[11]) ? clamp(s[11], -12, 12) : 0, vz: Number.isFinite(s[12]) ? clamp(s[12], -12, 12) : 0, raw: s }, false);
       }
       if (false && Array.isArray(pr.b)) for (const b of pr.b.slice(0, 12)) {
         if (!Array.isArray(b) || b.length < 11 || (b[1] !== 'A' && b[1] !== 'B') || !b.slice(3, 9).every(Number.isFinite)) continue;
@@ -1616,10 +1634,13 @@ const net = {
     }
     for (const [key, a] of this.remotes) if (!a.seen) { scene.remove(a.body.root); actors.splice(actors.indexOf(a), 1); this.remotes.delete(key); }
     // suaviza posição/rotação entre pacotes
-    const k = 1 - Math.exp(-14 * dt);
+    // prevê onde o jogador está agora (última posição + velocidade), no máximo 120 ms à frente
+    const k = 1 - Math.exp(-22 * dt);
     for (const a of this.remotes.values()) {
       const before = a.pos.clone();
-      if (a.pos.distanceTo(a.target) > 4) a.pos.copy(a.target); else a.pos.lerp(a.target, k);
+      const ahead = Math.min(0.12, (performance.now() - (a.tAt || 0)) / 1000);
+      const goal = a.tVel ? a.target.clone().addScaledVector(a.tVel, ahead) : a.target;
+      if (a.pos.distanceTo(goal) > 4) a.pos.copy(goal); else a.pos.lerp(goal, k);
       a.vel.copy(a.pos).sub(before).divideScalar(Math.max(dt, 1e-3));
       a.yaw += Math.atan2(Math.sin(a.tYaw - a.yaw), Math.cos(a.tYaw - a.yaw)) * k;
       a.pitch += (a.tPitch - a.pitch) * k;
@@ -1682,7 +1703,7 @@ const net = {
       if (vel.length() > 120) continue;
       pos.addScaledVector(vel, 0.03); // compensa um pouco a latência
       const m = new THREE.Mesh(ballGeo, ballMats[s[1]]); m.position.copy(pos); scene.add(m);
-      balls.push({ pos, vel, owner, team: s[1], mesh: m, life: 2.5 });
+      balls.push({ pos, vel, owner, team: s[1], mesh: m, life: 2.5, remote: true });
       sfx.shot(pos, false);
     }
   },
@@ -1701,6 +1722,22 @@ const net = {
     const owner = actors.find(a => a.key === d.k) || { key: String(d.k), team: d.t, name: '?', isPlayer: false };
     explodeNade(new V3(d.x, d.y, d.z), d.t, owner, true);
   },
+  emitHit(victim, shooter, part, point) {
+    if (!this.room) return;
+    this.room.emit('hit', { v: victim.key, k: shooter.key || '', p: part, x: r2(point.x), y: r2(point.y), z: r2(point.z) }).catch(() => {});
+  },
+  onHit(msg) {
+    if (msg.sameTab || !this.joined || !msg.data) return;
+    const d = msg.data, P = player;
+    if (d.v !== P.key || !P.alive || (P.spawnUntil && now() < P.spawnUntil)) return;
+    const part = ['head', 'torso', 'pernas'].includes(d.p) ? d.p : 'torso';
+    const killer = actors.find(a => a.key === d.k) || { key: String(d.k), team: P.team === 'A' ? 'B' : 'A', name: '?', isPlayer: false };
+    if (killer.team === P.team) return;
+    sfx.splat(P.pos);
+    const pt = [d.x, d.y, d.z].every(Number.isFinite) ? new V3(d.x, d.y, d.z) : P.eye();
+    this.emitOut(P, { owner: killer }, part, pt);
+    eliminate(P, killer, part);
+  },
   onOut(msg) {
     if (msg.sameTab || !this.joined || !msg.data) return;
     const d = msg.data;
@@ -1715,7 +1752,7 @@ const net = {
       }
       addFeed(killer, victim, part);
     }
-    if (killer.isPlayer) { S.stats.elims++; S.stats.hits++; if (part === 'head') S.stats.heads++; hitMarker(); sfx.hit(); onPlayerElim(part); }
+    if (killer.isPlayer) { S.stats.elims++; if (part === 'nade') { S.stats.hits++; hitMarker(); sfx.hit(); } if (part === 'head') S.stats.heads++; onPlayerElim(part); }
     else if (killer.auth && this.bots.includes(killer)) killer.kills = (killer.kills || 0) + 1;
   },
   renderBoard() {
@@ -1817,6 +1854,7 @@ function createWsRoom(url) {
   room.on('shot', m => net.onShot(m));
   room.on('nade', m => net.onNade(m));
   room.on('boom', m => net.onBoom(m));
+  room.on('hit', m => net.onHit(m));
   room.on('out', m => net.onOut(m));
   let lostAt = 0;
   room.onConnection(c => {
