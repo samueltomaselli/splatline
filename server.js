@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT) || 8080;
 const MAX_PEERS = Number(process.env.MAX_PEERS) || 24;
 const MAX_PRESENCE_BYTES = 4096;
 const MAX_EVENT_BYTES = 4096;
-const TOPICS = new Set(['shot', 'out']);
+const TOPICS = new Set(['shot', 'out', 'nade', 'boom']);
 
 const INDEX = path.join(__dirname, 'public', 'index.html');
 

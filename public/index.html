@@ -78,16 +78,31 @@
   .banner { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); text-align: center; }
   .banner .big { font: 900 clamp(48px, 10vw, 120px)/.9 var(--display); color: #fff; letter-spacing: .01em; text-shadow: 0 4px 0 rgba(0,0,0,.35); }
   .banner .sub { font: 700 13px/1.4 var(--mono); letter-spacing: .16em; color: var(--net); margin-top: 10px; text-shadow: 0 1px 2px #000; }
+  .nades { display: flex; gap: 6px; margin-top: 5px; }
+  .nade { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8 0 18%, transparent 20%), var(--magenta); box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
+  .nade.used { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(199,210,204,.35); }
+  .callout { position: absolute; left: 50%; top: 62%; transform: translate(-50%, -50%); font: 900 clamp(34px, 5vw, 58px)/1 var(--display); letter-spacing: .03em; color: var(--yellow); text-shadow: 0 3px 0 rgba(0,0,0,.4); pointer-events: none; opacity: 0; }
+  .callout.on { animation: callout 1.3s ease-out forwards; }
+  .callout small { display: block; font: 700 12px/1.4 var(--mono); letter-spacing: .16em; color: #fff; margin-top: 4px; }
+  @keyframes callout { 0% { opacity: 0; transform: translate(-50%, -30%) scale(1.4); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+  @media (prefers-reduced-motion: reduce) { .callout.on { animation-duration: .01s; opacity: 1; } }
   .toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); font: 600 13px/1.4 var(--body); background: rgba(15,21,18,.85); padding: 8px 14px; border-radius: 4px; max-width: min(520px, calc(100% - 32px)); text-align: center; }
   .splatflash { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease-out; }
   .splatflash.on { opacity: .9; transition: none; }
 
   /* ---------- Menu ---------- */
   .menu { position: fixed; inset: 0; z-index: 10; display: grid; justify-items: center; padding: 16px; background: radial-gradient(120% 90% at 30% 20%, rgba(15,21,18,.55), rgba(15,21,18,.92)); overflow-y: auto; }
-  .card { width: min(560px, 100%); display: grid; gap: 18px; margin-block: auto; }
+  .card { width: min(560px, 100%); display: grid; gap: 16px; margin-block: auto; }
+  .controls { display: grid; gap: 14px; align-content: center; }
+  @media (min-width: 880px) {
+    .card { width: min(1040px, 100%); grid-template-columns: 1fr minmax(380px, 460px); gap: 48px; align-items: center; }
+    .brand { gap: 14px; }
+  }
+  @media (max-height: 820px) { .tag { font-size: 15px; } .seg button { padding: 9px 8px; } .go { padding: 14px 18px; font-size: 22px; } .controls { gap: 11px; } }
+  @media (max-height: 700px) { .legend, .rules { display: none; } }
   .brand { display: grid; gap: 6px; }
   .eyebrow { font: 700 11px/1 var(--mono); letter-spacing: .2em; color: var(--muted); }
-  .logo { font: 900 clamp(56px, min(14vw, 13vh), 116px)/.82 var(--display); color: #fff; letter-spacing: -.01em; position: relative; }
+  .logo { font: 900 clamp(48px, min(11vw, 13vh), 132px)/.82 var(--display); color: #fff; letter-spacing: -.01em; position: relative; }
   .logo .dot { color: var(--yellow); }
   .tag { font: 500 17px/1.45 var(--body); color: var(--net); max-width: 44ch; text-wrap: balance; }
   .row { display: grid; gap: 8px; }
@@ -117,7 +132,7 @@
   .go:hover { filter: brightness(1.06); }
   .go:focus-visible, .seg button:focus-visible, input:focus-visible, .ghost:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
   .ghost { font: 600 13px/1 var(--body); background: transparent; color: var(--muted); border: 1px solid rgba(199,210,204,.2); padding: 10px 14px; border-radius: 5px; cursor: pointer; justify-self: start; }
-  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 18px; font: 500 12px/1.5 var(--mono); color: var(--muted); border-top: 1px solid rgba(199,210,204,.12); padding-top: 16px; }
+  .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; font: 500 12px/1.5 var(--mono); color: var(--muted); border-top: 1px solid rgba(199,210,204,.12); padding-top: 12px; max-width: 44ch; }
   .legend b { color: var(--net); display: inline-block; min-width: 64px; }
   .rules { font: 500 13px/1.55 var(--body); color: var(--muted); }
   .rules strong { color: var(--net); }
@@ -145,8 +160,10 @@
   <div class="ammo">
     <div><div class="n" id="hopper">200</div><div class="lbl">BOLAS NO LOADER</div><div class="reloadbar"><i id="reloadbar"></i></div></div>
     <div><div class="pods" id="pods"></div><div class="lbl" style="margin-top:6px">PODS</div></div>
+    <div><div class="nades" id="nades"></div><div class="lbl" style="margin-top:6px">GRANADAS · G</div></div>
   </div>
-  <div class="keys"><b>WASD</b> mover · <b>SHIFT</b> andar · <b>CTRL/C</b> agachar<br><b>R</b> despejar pod · <b>ESPAÇO</b> pular · <b>ESC</b> menu<span id="tabHint"> · <b>TAB</b> placar</span></div>
+  <div class="callout" id="callout"></div>
+  <div class="keys"><b>WASD</b> mover · <b>SHIFT</b> andar · <b>CTRL/C</b> agachar<br><b>R</b> despejar pod · <b>G</b> granada · <b>C correndo</b> carrinho<br><b>ESPAÇO</b> pular · <b>ESC</b> menu<span id="tabHint"> · <b>TAB</b> placar</span></div>
   <div class="banner" id="banner" hidden><div class="big" id="bannerBig"></div><div class="sub" id="bannerSub"></div></div>
   <div class="toast" id="toast" hidden></div>
   <div class="board" id="board" hidden></div>
@@ -160,7 +177,14 @@
       <span class="eyebrow">SPEEDBALL · 3 CONTRA 3 · CAMPO DE 36 × 45 M</span>
       <div class="logo">SPLAT<br>LINE<span class="dot">.</span></div>
       <p class="tag">Paintball em primeira pessoa. As bolas têm voo real, com queda e tempo de trajeto. Uma bola que quebra em você te elimina. A tinta fica marcada no campo.</p>
+      <div class="legend">
+        <span><b>Mouse</b> mirar</span><span><b>Clique</b> atirar</span>
+        <span><b>WASD</b> mover</span><span><b>Ctrl / C</b> agachar</span>
+        <span><b>Shift</b> andar</span><span><b>R</b> despejar pod</span>
+        <span><b>G</b> granada de tinta</span><span><b>C</b> correndo: carrinho</span>
+      </div>
     </div>
+    <div class="controls">
     <div class="row">
       <span class="lab">MODO</span>
       <div class="seg" id="mode">
@@ -173,7 +197,7 @@
       <label for="nick">SEU NOME</label>
       <div class="inline"><input type="text" id="nick" maxlength="14" placeholder="Seu apelido" autocomplete="off" spellcheck="false"><span class="roomline" id="roomLine">Procurando a sala…</span></div>
     </div>
-    <div class="row">
+    <div class="row" id="diffRow">
       <span class="lab" id="diffLabel">NÍVEL DO TIME ADVERSÁRIO</span>
       <div class="seg" id="diff">
         <button type="button" data-d="recreativo" aria-pressed="false">Recreativo<small>reagem devagar</small></button>
@@ -191,10 +215,6 @@
     <div id="endStats" hidden class="stats"></div>
     <button type="button" class="go" id="start"><span id="startLabel">ENTRAR NO CAMPO</span><span aria-hidden="true">→</span></button>
     <button type="button" class="ghost" id="restart" hidden>Reiniciar partida</button>
-    <div class="legend">
-      <span><b>Mouse</b> mirar</span><span><b>Clique</b> atirar (segurar = 10 bps)</span>
-      <span><b>WASD</b> mover</span><span><b>Ctrl / C</b> agachar</span>
-      <span><b>Shift</b> andar</span><span><b>R</b> despejar pod</span>
     </div>
   </div>
 </div>
@@ -217,19 +237,19 @@ const TEAMS = {
   B: { key: 'B', name: 'VERMELHO', jersey: 0xe5484d, paint: 0xff2e88, css: '#e5484d', paintCss: '#ff2e88' },
 };
 const DIFF = {
-  recreativo: { react: [0.6, 1.0], err: 3.4, rof: 4, peek: [1.1, 2.0], hide: [1.4, 2.8], aggro: 0.2 },
-  torneio:    { react: [0.34, 0.6], err: 1.9, rof: 6, peek: [1.4, 2.6], hide: [1.0, 2.2], aggro: 0.35 },
-  pro:        { react: [0.2, 0.36], err: 1.0, rof: 8.5, peek: [1.7, 3.0], hide: [0.8, 1.6], aggro: 0.5 },
+  recreativo: { react: [0.6, 1.0], err: 3.4, rof: 2.6, peek: [1.1, 2.0], hide: [1.4, 2.8], aggro: 0.2 },
+  torneio:    { react: [0.34, 0.6], err: 1.9, rof: 3.6, peek: [1.4, 2.6], hide: [1.0, 2.2], aggro: 0.35 },
+  pro:        { react: [0.2, 0.36], err: 1.0, rof: 4.6, peek: [1.7, 3.0], hide: [0.8, 1.6], aggro: 0.5 },
 };
 const ALLY_DIFF = DIFF.torneio;
 const NAMES_A = ['VOCÊ', 'TATU', 'BIRA'];
 const NAMES_B = ['RATO', 'JACA', 'PITBULL'];
 const NAMES_DM = ['RATO', 'JACA', 'PITBULL', 'ZECA', 'BAIANO'];
 const DM_TIME = 300, DM_RESPAWN_PLAYER = 2, DM_RESPAWN_BOT = 2.5, SPAWN_SHIELD = 1.5;
-const ONLINE_RESPAWN = 3, ONLINE_SHIELD = 2, FILL_TEAM = 3;
+const ONLINE_RESPAWN = 3, ONLINE_SHIELD = 2;
 const BOT_NAMES = ['TATU', 'BIRA', 'RATO', 'JACA', 'PITBULL', 'ZECA', 'BAIANO', 'GRILO', 'CATITA', 'TOCO'];
 const RULES = {
-  online: '<strong>Online:</strong> todo mundo que abrir este link cai na mesma sala. Você entra num dos dois times, sorteado para equilibrar. Time contra time, com respawn em 3 s na sua base. Se faltar gente, bots completam até 3 por time.',
+  online: '<strong>Online:</strong> todo mundo que abrir este link cai na mesma sala. Você entra num dos dois times, sorteado para equilibrar. Speedball por pontos, só gente de verdade: foi eliminado, espera o próximo ponto. Vence o ponto o time que eliminar todos do outro (ou tiver mais gente viva quando os 2 minutos acabam). Enquanto não houver alguém em cada time, é aquecimento livre com respawn.',
   speedball: '<strong>Regras:</strong> partida até 4 pontos. Cada ponto dura até 2 minutos. Vence o time que eliminar todos os adversários, ou, quando o tempo acaba, o que tiver mais jogadores vivos. Loader de 200 bolas e 4 pods de 140.',
   dm: '<strong>Mata-mata:</strong> treino de 5 minutos contra 5 bots, todos atrás de você. Quem é eliminado volta em 2 segundos num ponto aleatório do campo, com 1,5 s de proteção. Pods infinitos. Conta abates, mortes, acertos na máscara e precisão.',
 };
@@ -455,6 +475,10 @@ const sfx = {
   horn: () => { tone(233, .6, .14, 'sawtooth'); tone(311, .6, .1, 'sawtooth'); },
   beep: () => tone(880, .12, .12, 'square'),
   dump: () => { noise(2400, .6, .5, .12); },
+  toss: p => { const v = distVol(p); noise(900, .7, .15, .12 * v); },
+  bounce: p => { const v = distVol(p); tone(220, .06, .12 * v, 'triangle', .6); },
+  boom: p => { const v = distVol(p); noise(260, .5, .6, .6 * v, 'lowpass'); tone(70, .45, .5 * v, 'sine', .4); noise(1600, .8, .35, .25 * v); },
+  slide: () => { noise(500, .5, .5, .18, 'lowpass'); },
 };
 
 // ---------------- actors ----------------
@@ -606,6 +630,129 @@ function updateBalls(dt) {
   }
 }
 
+
+// ---------------- granada de tinta ----------------
+const NADES_PER_LIFE = 2, NADE_SPEED = 11, NADE_FUSE = 1.5, NADE_RADIUS = 3.2;
+const SLIDE_TIME = 0.6, SLIDE_SPEED = 8.8, SLIDE_CD = 1.0;
+const nades = [], drops = [];
+const nadeGeo = new THREE.SphereGeometry(0.07, 14, 10), bandGeo = new THREE.TorusGeometry(0.07, 0.012, 6, 16);
+const dropGeo = new THREE.SphereGeometry(0.06, 6, 5);
+let nadeSeq = 0;
+function makeNadeMesh(team) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(nadeGeo, new THREE.MeshStandardMaterial({ color: TEAMS[team].paint, roughness: .35 })));
+  const band = new THREE.Mesh(bandGeo, new THREE.MeshStandardMaterial({ color: 0x16191b })); band.rotation.x = Math.PI / 2; g.add(band);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  scene.add(g); return g;
+}
+function throwNade(owner, pos, vel, remoteId) {
+  const id = remoteId || `${owner.key || 'loc'}:${++nadeSeq}`;
+  const n = { id, owner, team: owner.team, pos: pos.clone(), vel: vel.clone(), fuse: NADE_FUSE, mesh: makeNadeMesh(owner.team), remote: !!remoteId, spin: new V3(rand(-9, 9), rand(-9, 9), rand(-9, 9)) };
+  nades.push(n);
+  sfx.toss(pos);
+  if (!remoteId && S.mode === 'online' && owner.auth && net.room) net.room.emit('nade', { i: id, t: owner.team, k: owner.key || '', o: [r2(pos.x), r2(pos.y), r2(pos.z)], v: [r2(vel.x), r2(vel.y), r2(vel.z)] }).catch(() => {});
+  return n;
+}
+function updateNades(dt) {
+  for (let i = nades.length - 1; i >= 0; i--) {
+    const n = nades[i];
+    n.fuse -= dt;
+    const p0 = n.pos.clone();
+    n.vel.y -= G * dt;
+    const p1 = p0.clone().addScaledVector(n.vel, dt);
+    const hit = worldHit(p0, p1);
+    if (hit) {
+      const nrm = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      n.vel.reflect(nrm).multiplyScalar(0.42);
+      p1.copy(hit.point).addScaledVector(nrm, 0.08);
+      if (n.vel.length() > 2) sfx.bounce(p1);
+    }
+    if (p1.y < 0.07) { p1.y = 0.07; if (n.vel.y < 0) { if (n.vel.y < -2) sfx.bounce(p1); n.vel.y *= -0.3; n.vel.x *= 0.5; n.vel.z *= 0.5; } n.vel.x *= Math.pow(0.002, dt); n.vel.z *= Math.pow(0.002, dt); }
+    if (Math.abs(p1.x) > NET_X - 0.1) { p1.x = Math.sign(p1.x) * (NET_X - 0.1); n.vel.x *= -0.3; }
+    if (Math.abs(p1.z) > NET_Z - 0.1) { p1.z = Math.sign(p1.z) * (NET_Z - 0.1); n.vel.z *= -0.3; }
+    n.pos.copy(p1); n.mesh.position.copy(p1);
+    n.mesh.rotation.x += n.spin.x * dt; n.mesh.rotation.y += n.spin.y * dt; n.mesh.rotation.z += n.spin.z * dt;
+    n.spin.multiplyScalar(Math.pow(0.4, dt));
+    // pisca antes de estourar
+    n.mesh.children[0].material.emissive.setHex(n.fuse < 0.5 && (n.fuse * 12 | 0) % 2 ? 0x555555 : 0x000000);
+    if (n.remote) { if (n.fuse < -1.5) { scene.remove(n.mesh); nades.splice(i, 1); } continue; }
+    if (n.fuse <= 0) {
+      scene.remove(n.mesh); nades.splice(i, 1);
+      explodeNade(n.pos, n.team, n.owner, true);
+      if (S.mode === 'online' && n.owner.auth && net.room) net.room.emit('boom', { i: n.id, t: n.team, k: n.owner.key || '', x: r2(n.pos.x), y: r2(n.pos.y), z: r2(n.pos.z) }).catch(() => {});
+    }
+  }
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i]; d.life -= dt;
+    d.vel.y -= G * dt; d.mesh.position.addScaledVector(d.vel, dt);
+    if (d.mesh.position.y <= 0.02 || d.life <= 0) {
+      if (d.mesh.position.y <= 0.02 && Math.random() < 0.35) addDecal(new V3(d.mesh.position.x, 0, d.mesh.position.z), new V3(0, 1, 0), d.color, rand(0.12, 0.28));
+      scene.remove(d.mesh); drops.splice(i, 1);
+    }
+  }
+}
+function explodeNade(pos, team, owner, withDamage) {
+  const color = TEAMS[team].paint;
+  sfx.boom(pos);
+  // respingos voando
+  const mat = ballMats[team];
+  for (let i = 0; i < 46; i++) {
+    const m = new THREE.Mesh(dropGeo, mat); m.position.copy(pos); m.scale.setScalar(rand(0.5, 1.4)); scene.add(m);
+    const a = Math.random() * Math.PI * 2, up = rand(1.5, 7), out = rand(3, 9);
+    drops.push({ mesh: m, vel: new V3(Math.cos(a) * out, up, Math.sin(a) * out), life: rand(0.6, 1.4), color });
+  }
+  // marca no chão e nos bunkers em volta
+  const c = pos.clone(); c.y = Math.max(0.35, c.y);
+  const down = worldHit(c, new V3(c.x, -0.1, c.z));
+  if (!down) addDecal(new V3(pos.x, 0, pos.z), new V3(0, 1, 0), color, rand(2.4, 3.0));
+  for (let i = 0; i < 18; i++) {
+    const a = i / 18 * Math.PI * 2;
+    for (const h of [0.4, 1.1]) {
+      const from = new V3(pos.x, h, pos.z), to = from.clone().add(new V3(Math.cos(a) * NADE_RADIUS, 0, Math.sin(a) * NADE_RADIUS));
+      const hit = worldHit(from, to);
+      if (hit) addDecal(hit.point, hit.face.normal.clone().transformDirection(hit.object.matrixWorld), color, rand(0.5, 0.95) * (1 - hit.distance / (NADE_RADIUS + 1)));
+    }
+  }
+  // tremor se estiver perto
+  if (player) { const d = player.pos.distanceTo(pos); if (d < 9) kick = Math.max(kick, 1.4 * (1 - d / 9)); }
+  if (!withDamage) return;
+  const center = pos.clone(); center.y = Math.max(0.3, center.y + 0.2);
+  for (const a of actors) {
+    if (!a.alive || a.team === team || (a.spawnUntil && now() < a.spawnUntil)) continue;
+    if (S.mode === 'online' && !a.auth) continue;
+    const vols = a.volumes();
+    const inRange = vols.some(v => Math.hypot(v.x - center.x, v.y - center.y, v.z - center.z) < NADE_RADIUS);
+    if (!inRange) continue;
+    const exposed = vols.some(v => Math.hypot(v.x - center.x, v.y - center.y, v.z - center.z) < NADE_RADIUS && !worldHit(center, new V3(v.x, v.y, v.z)));
+    if (!exposed) continue;
+    const vt = vols[1];
+    if (a.body) { const n = new V3(vt.x - center.x, 0, vt.z - center.z).normalize().negate(); const dec = addDecal(new V3(vt.x, vt.y, vt.z).addScaledVector(n, 0.26), n, color, 0.45, a.body.root); dec.userData.paint = true; }
+    if (owner.isPlayer) { S.stats.hits++; hitMarker(); sfx.hit(); }
+    if (S.mode === 'online') net.emitOut(a, { owner }, 'nade', new V3(vt.x, vt.y, vt.z));
+    eliminate(a, owner, 'nade');
+  }
+}
+function botMaybeNade(b) {
+  if (!b.nades || S.mode === 'online') return false;
+  const tp = threatPoint(b);
+  const dx = tp.x - b.pos.x, dz = tp.z - b.pos.z, d = Math.hypot(dx, dz);
+  if (d < 7 || d > 20 || Math.random() > 0.22) return false;
+  const T = 1.05, e = b.eye();
+  const vel = new V3(dx / T, (0.2 - e.y + 0.5 * G * T * T) / T, dz / T);
+  b.nades--; throwNade(b, e.addScaledVector(vel.clone().normalize(), 0.4), vel);
+  return true;
+}
+function onPlayerElim(part) {
+  player.streak = (player.streak || 0) + 1;
+  const n = player.streak;
+  const big = n >= 5 ? 'IMPARÁVEL!' : n === 4 ? 'QUÁDRUPLA!' : n === 3 ? 'TRIPLA!' : n === 2 ? 'DUPLA!' : part === 'head' ? 'NA MÁSCARA!' : part === 'nade' ? 'SPLASH!' : '';
+  if (!big) return;
+  const sub = n >= 2 ? `${n} SEGUIDAS SEM MORRER` : part === 'head' ? 'TIRO NA VISEIRA' : 'GRANADA CERTEIRA';
+  const c = el('callout'); c.textContent = big; const sm = document.createElement('small'); sm.textContent = sub; c.append(sm);
+  c.classList.remove('on'); void c.offsetWidth; c.classList.add('on');
+  if (n >= 2) { tone(660, .12, .12, 'square'); setTimeout(() => tone(990, .18, .12, 'square'), 110); }
+}
+
 // ---------------- game state ----------------
 let player = null;
 const S = { mode: 'online', diff: 'torneio', sens: 2, scoreA: 0, scoreB: 0, phase: 'menu', phaseEnd: 0, roundStart: 0, round: 0, time: 0, paused: true,
@@ -659,6 +806,7 @@ function respawn(a) {
   a.pos.copy(p); a.vel.set(0, 0, 0);
   a.yaw = S.mode === 'online' ? (a.team === 'A' ? 0 : Math.PI) : Math.atan2(p.x, p.z); a.pitch = 0; a.crouch = 0; a.wantCrouch = false; a.grounded = true;
   a.alive = true; a.hopper = 200; a.pods = 4; a.reloadEnd = 0; a.pendingPod = false; a.nextShot = 0; a.outAt = 0;
+  a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
   a.spawnUntil = now() + (S.mode === 'online' ? ONLINE_SHIELD : SPAWN_SHIELD); a.respawnAt = 0;
   if (a.body) {
     a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0); a.body.arms.rotation.set(0, 0, 0);
@@ -687,6 +835,7 @@ function startRound() {
   if (S.mode === 'online') return net.start();
   S.round++;
   for (const B of balls) scene.remove(B.mesh); balls.length = 0;
+  for (const n of nades) scene.remove(n.mesh); nades.length = 0;
   for (const b of bunkers) b.occupied = null;
   const xs = [0, -4.5, 4.5];
   for (const a of actors) {
@@ -694,6 +843,7 @@ function startRound() {
     a.pos.set(xs[a.slot] * sign, 0, 21.4 * sign); a.vel.set(0, 0, 0);
     a.yaw = a.team === 'A' ? 0 : Math.PI; a.pitch = 0; a.crouch = 0; a.wantCrouch = false;
     a.alive = true; a.hopper = 200; a.pods = 4; a.reloadEnd = 0; a.nextShot = 0; a.outAt = 0; a.grounded = true;
+    a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
     if (a.body) {
       a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0);
       const stale = []; a.body.root.traverse(o => { if (o.userData.paint) stale.push(o); });
@@ -715,12 +865,14 @@ function eliminate(a, by, part) {
     S.stats.outs++;
     sfx.out();
     flashSplat(TEAMS[by.team].paintCss);
-    showBanner('ELIMINADO', `${by.name} TE ACERTOU NA ${part === 'head' ? 'MÁSCARA' : part === 'torso' ? 'CAMISA' : 'PERNA'}`, S.mode === 'dm' ? DM_RESPAWN_PLAYER : S.mode === 'online' ? ONLINE_RESPAWN : 2.2);
-    spectate = S.mode === 'speedball';
+    showBanner('ELIMINADO', part === 'nade' ? `${by.name} TE PEGOU COM UMA GRANADA` : `${by.name} TE ACERTOU NA ${part === 'head' ? 'MÁSCARA' : part === 'torso' ? 'CAMISA' : 'PERNA'}`, S.mode === 'dm' ? DM_RESPAWN_PLAYER : S.mode === 'online' ? (net.round.ph === 'wait' ? ONLINE_RESPAWN : 4) : 2.2);
+    if (S.mode === 'online' && net.round.ph !== 'wait') setTimeout(() => { if (!player.alive && S.mode === 'online') showBanner('FORA DO PONTO', 'ESPERE O PRÓXIMO PONTO', 999); }, 2200);
+    spectate = S.mode === 'speedball' || (S.mode === 'online' && net.round.ph !== 'wait');
   }
-  if (by.isPlayer) { S.stats.elims++; if (part === 'head') S.stats.heads++; }
+  if (by.isPlayer) { S.stats.elims++; if (part === 'head') S.stats.heads++; onPlayerElim(part); }
+  if (a.isPlayer) a.streak = 0;
   if (S.mode === 'dm') { a.respawnAt = now() + (a.isPlayer ? DM_RESPAWN_PLAYER : DM_RESPAWN_BOT); return; }
-  if (S.mode === 'online') { if (a.auth) a.respawnAt = now() + ONLINE_RESPAWN; if (!by.isPlayer && by.auth && by !== a) by.kills = (by.kills || 0) + 1; return; }
+  if (S.mode === 'online') { if (a.auth) a.respawnAt = net.round.ph === 'wait' ? now() + ONLINE_RESPAWN : 0; if (!by.isPlayer && by.auth && by !== a) by.kills = (by.kills || 0) + 1; return; }
   checkRoundEnd();
 }
 function onActorHit(a, B, part, point, vol) {
@@ -843,6 +995,7 @@ function updateBot(b, dt) {
     b.yaw = Math.atan2(-dx, -dz); b.pitch *= 0.9;
     if (t >= b.stateEnd) {
       const enemyZ = b.team === 'A' ? -1 : 1;
+      if (botMaybeNade(b)) { b.stateEnd = t + rand(...d.hide); return; }
       // fim de ponto e time desfalcado deixam os bots mais agressivos (evita empate por tempo)
       const aggro = d.aggro + (t - S.roundStart > 45 ? 0.3 : 0) + 0.12 * (3 - aliveCount(b.team));
       if (S.mode !== 'speedball' && Math.random() < d.aggro + 0.25) {
@@ -891,9 +1044,13 @@ let mouseDown = false, locked = false, lookFallback = false, dragLook = false;
 let spectate = false;
 const spotted = new Map();
 
+// Marcador semiautomático: um tiro por clique. Clicar muito rápido esquenta a
+// mira (heat) e abre a dispersão; tiros cadenciados saem precisos.
+const SHOT_GAP = 0.16, HEAT_PER_SHOT = 0.9, HEAT_MAX = 4.5, HEAT_COOL = 3.2, CLICK_BUFFER = 0.12;
+let triggerAt = -1, heat = 0;
 function playerDispersion() {
   const sp = Math.hypot(player.vel.x, player.vel.z);
-  let d = 0.35 + (sp / 5.5) * 1.5 + (player.grounded ? 0 : 3);
+  let d = 0.3 + heat + (sp / 5.5) * 1.5 + (player.grounded ? 0 : 3);
   if (player.crouch > .5) d *= 0.7;
   return d;
 }
@@ -901,7 +1058,7 @@ function updatePlayer(dt) {
   const p = player, t = now();
   if (S.paused) { p.vel.x *= 0.8; p.vel.z *= 0.8; p.wantCrouch = false; }
   if (!p.alive || S.paused) return;
-  const canMove = S.phase === 'live' || S.phase === 'post';
+  const canMove = (S.phase === 'live' || S.phase === 'post') && !p.frozen;
   p.wantCrouch = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyC');
   const f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   const r = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
@@ -910,25 +1067,56 @@ function updatePlayer(dt) {
   p.pitch = clamp(p.pitch, -85 * DEG, 85 * DEG);
   const walk = keys.has('ShiftLeft') || keys.has('ShiftRight');
   let spd = walk ? 2.6 : 5.5; if (p.crouch > .5) spd = 2.2;
+  // carrinho: correndo + C/Ctrl = desliza para o bunker
+  if (slideReq) {
+    slideReq = false;
+    const hs = Math.hypot(p.vel.x, p.vel.z);
+    if (canMove && p.grounded && !walk && hs > 4.2 && t > (p.slideReady || 0)) {
+      p.slideUntil = t + SLIDE_TIME; p.slideReady = t + SLIDE_TIME + SLIDE_CD;
+      p.vel.x *= SLIDE_SPEED / hs; p.vel.z *= SLIDE_SPEED / hs; sfx.slide();
+    }
+  }
+  if (p.slideUntil > t) {
+    p.wantCrouch = true;
+    const k = Math.pow(0.18, dt); p.vel.x *= k; p.vel.z *= k;
+    return shootAndNade(p, t, canMove);
+  }
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
   let wx = fx * f + rx * r, wz = fz * f + rz * r; const wl = Math.hypot(wx, wz);
   if (wl > 0) { wx = wx / wl * spd; wz = wz / wl * spd; }
   if (!canMove) { wx = wz = 0; }
-  const acc = p.grounded ? 12 : 2.5;
+  const acc = p.grounded ? 12 : 2.5; /* movimento normal */
   p.vel.x += (wx - p.vel.x) * Math.min(1, acc * dt);
   p.vel.z += (wz - p.vel.z) * Math.min(1, acc * dt);
   if (keys.has('Space') && p.grounded && canMove) { p.vel.y = 4.4; p.grounded = false; }
   // tiro
-  if (mouseDown && canMove && S.phase === 'live' && t >= p.nextShot && t >= p.reloadEnd) {
+  shootAndNade(p, t, canMove, dt);
+}
+function shootAndNade(p, t, canMove, dt = 1 / 60) {
+  if (nadeReq) {
+    nadeReq = false;
+    if (canMove && S.phase === 'live' && p.nades > 0 && t > (p.nadeReady || 0)) {
+      p.nades--; p.nadeReady = t + 0.8; throwAnim = 1;
+      const dir = aimDir(p.yaw, p.pitch + 0.2);
+      throwNade(p, p.eye().addScaledVector(dir, 0.4), dir.multiplyScalar(NADE_SPEED).add(new V3(p.vel.x * .5, 1.2, p.vel.z * .5)));
+    } else if (p.nades <= 0) toast('Sem granadas nesta vida.');
+  }
+  heat = Math.max(0, heat - HEAT_COOL * dt);
+  const pending = triggerAt >= 0 && t - triggerAt <= CLICK_BUFFER + SHOT_GAP;
+  if (triggerAt >= 0 && !pending) triggerAt = -1;
+  if (pending && canMove && S.phase === 'live' && t >= p.nextShot && t >= p.reloadEnd) {
+    triggerAt = -1;
     if (p.hopper > 0) {
-      p.hopper--; p.nextShot = t + 0.1; S.stats.shots++;
+      p.hopper--; p.nextShot = t + SHOT_GAP; S.stats.shots++;
       const e = playerDispersion() * DEG, g = () => (Math.random() + Math.random() - 1);
       fire(p, aimDir(p.yaw + g() * e, p.pitch + g() * e));
+      heat = Math.min(HEAT_MAX, heat + HEAT_PER_SHOT);
       kick = 1;
     } else if (!emptyWarned) { toast('Loader vazio — aperte R para despejar um pod.'); emptyWarned = true; }
   }
   if (keys.has('KeyR')) reload();
 }
+let slideReq = false, nadeReq = false;
 let kick = 0, emptyWarned = false;
 function reload() {
   const p = player, t = now();
@@ -948,19 +1136,93 @@ function integrate(a, dt) {
 
 // ---------------- view model ----------------
 const vm = new THREE.Group(); camera.add(vm);
+const vmParts = {};
 (() => {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.5), gunMat); m.position.set(0, 0, -0.1); vm.add(m);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.45, 12), gunMat); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.02, -0.55); vm.add(barrel);
-  const hop = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12), new THREE.MeshStandardMaterial({ color: 0x1c2126, roughness: .25, metalness: .2 })); hop.scale.set(.9, .75, 1.35); hop.position.set(0, 0.13, -0.05); vm.add(hop);
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.3, 14), new THREE.MeshStandardMaterial({ color: 0x9aa5ab, metalness: .8, roughness: .3 })); tank.rotation.x = Math.PI / 2; tank.position.set(0, -0.08, 0.2); vm.add(tank);
-  const glove = new THREE.MeshStandardMaterial({ color: 0x223049, roughness: .85 });
-  const h1 = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.12), glove); h1.position.set(0.0, -0.07, 0.02); vm.add(h1);
-  const h2 = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.12), glove); h2.position.set(-0.02, -0.04, -0.3); vm.add(h2);
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: .45, metalness: .25, ...o });
+  const black = M(0x16191b, { roughness: .35, metalness: .45 }), anod = M(0xffd23f, { roughness: .3, metalness: .6 });
+  const alu = M(0xb9c2c7, { roughness: .25, metalness: .85 }), rubber = M(0x0d0f10, { roughness: .9, metalness: 0 });
+  const glove = M(0x1b2536, { roughness: .9, metalness: 0 }), knuckle = M(0x2f6fed, { roughness: .7, metalness: 0 });
+  const add = (geo, mat, x, y, z, parent = vm) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const gun = new THREE.Group(); vm.add(gun); vmParts.gun = gun;
+  // corpo (receiver) com recortes e trilho
+  add(new THREE.BoxGeometry(0.06, 0.1, 0.32), black, 0, 0, -0.12, gun);
+  add(new THREE.BoxGeometry(0.062, 0.035, 0.2), anod, 0, 0.012, -0.14, gun);
+  add(new THREE.BoxGeometry(0.03, 0.012, 0.3), black, 0, 0.056, -0.12, gun);
+  for (let i = 0; i < 5; i++) add(new THREE.BoxGeometry(0.064, 0.006, 0.012), alu, 0, -0.03, -0.22 + i * 0.045, gun);
+  // cano com porting
+  const barrel = add(new THREE.CylinderGeometry(0.019, 0.022, 0.52, 20), black, 0, 0.02, -0.52, gun); barrel.rotation.x = Math.PI / 2;
+  for (let i = 0; i < 6; i++) { const ring = add(new THREE.TorusGeometry(0.02, 0.0035, 6, 18), alu, 0, 0.02, -0.64 - i * 0.022, gun); }
+  const tip = add(new THREE.CylinderGeometry(0.024, 0.024, 0.03, 20), anod, 0, 0.02, -0.785, gun); tip.rotation.x = Math.PI / 2;
+  const coupler = add(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 20), alu, 0, 0.02, -0.28, gun); coupler.rotation.x = Math.PI / 2;
+  // pescoço e loader (translúcido, com bolas dentro)
+  add(new THREE.CylinderGeometry(0.018, 0.022, 0.07, 14), alu, 0, 0.085, -0.1, gun);
+  const shell = add(new THREE.SphereGeometry(0.1, 24, 16), new THREE.MeshStandardMaterial({ color: 0x9fd0ff, roughness: .1, metalness: .1, transparent: true, opacity: .32, depthWrite: false }), 0, 0.17, -0.07, gun);
+  shell.scale.set(.72, .6, 1.2);
+  const lid = add(new THREE.SphereGeometry(0.1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2.6), black, 0, 0.18, -0.07, gun); lid.scale.set(.74, .6, 1.22);
+  const balls = new THREE.Group(); gun.add(balls); balls.position.set(0, 0.155, -0.07);
+  const bm = new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: .3, emissive: 0x3a2a00 });
+  const bg = new THREE.SphereGeometry(0.014, 10, 8);
+  for (let i = 0; i < 26; i++) { const b = new THREE.Mesh(bg, bm); const a = i * 2.39996, rr = 0.012 + (i % 9) * 0.006; b.position.set(Math.cos(a) * rr * .75, Math.floor(i / 9) * 0.024 - 0.02, Math.sin(a) * rr * 1.45); b.userData.base = b.position.clone(); balls.add(b); }
+  vmParts.balls = balls; vmParts.shell = shell;
+  // empunhadura, guarda-mato e gatilho
+  const grip = add(new THREE.BoxGeometry(0.045, 0.13, 0.055), rubber, 0, -0.1, -0.02, gun); grip.rotation.x = 0.28;
+  const guard = add(new THREE.TorusGeometry(0.035, 0.006, 6, 18, Math.PI), black, 0, -0.06, -0.09, gun); guard.rotation.set(0, Math.PI / 2, Math.PI);
+  const trig = add(new THREE.BoxGeometry(0.008, 0.035, 0.012), alu, 0, -0.065, -0.09, gun); vmParts.trigger = trig;
+  const fore = add(new THREE.BoxGeometry(0.04, 0.1, 0.05), rubber, 0, -0.095, -0.17, gun); fore.rotation.x = 0.12;
+  // cilindro de ar com regulador e manômetro
+  const tank = add(new THREE.CylinderGeometry(0.048, 0.048, 0.26, 24), alu, 0, -0.1, 0.19, gun); tank.rotation.x = Math.PI / 2;
+  const cap = add(new THREE.SphereGeometry(0.048, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), alu, 0, -0.1, 0.32, gun); cap.rotation.x = Math.PI / 2;
+  const reg = add(new THREE.CylinderGeometry(0.03, 0.036, 0.05, 18), black, 0, -0.1, 0.045, gun); reg.rotation.x = Math.PI / 2;
+  const gauge = add(new THREE.CylinderGeometry(0.018, 0.018, 0.01, 18), alu, 0.034, -0.08, 0.05, gun); gauge.rotation.z = Math.PI / 2;
+  add(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 18), new THREE.MeshBasicMaterial({ color: 0xf1f4f2 }), 0.037, -0.08, 0.05, gun).rotation.z = Math.PI / 2;
+  add(new THREE.BoxGeometry(0.02, 0.07, 0.02), black, 0, -0.07, 0.0, gun);
+  // mão direita no punho (palma + dedos no gatilho)
+  const rh = new THREE.Group(); gun.add(rh); rh.position.set(0.012, -0.09, -0.01); rh.rotation.x = 0.28;
+  add(new THREE.BoxGeometry(0.065, 0.1, 0.07), glove, 0.02, 0, 0.005, rh);
+  add(new THREE.BoxGeometry(0.066, 0.025, 0.02), knuckle, 0.02, 0.03, 0.045, rh);
+  for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(0.055, 0.022, 0.03), glove, 0.0, -0.035 + i * 0.026, -0.04, rh);
+  const tf = add(new THREE.BoxGeometry(0.018, 0.018, 0.045), glove, -0.028, 0.035, -0.06, rh); vmParts.finger = tf;
+  const sleeveR = add(new THREE.CylinderGeometry(0.045, 0.05, 0.28, 14), M(0x2f6fed, { roughness: .8, metalness: 0 }), 0.03, -0.02, 0.17, rh); sleeveR.rotation.x = Math.PI / 2 - 0.3;
+  // mão esquerda no foregrip
+  const lh = new THREE.Group(); gun.add(lh); lh.position.set(-0.02, -0.1, -0.17); lh.rotation.set(0.1, 0, 0.15);
+  add(new THREE.BoxGeometry(0.07, 0.09, 0.07), glove, -0.02, 0, 0, lh);
+  add(new THREE.BoxGeometry(0.02, 0.07, 0.06), glove, 0.03, 0.01, -0.01, lh);
+  const sleeveL = add(new THREE.CylinderGeometry(0.045, 0.05, 0.32, 14), M(0x2f6fed, { roughness: .8, metalness: 0 }), -0.07, -0.06, 0.13, lh); sleeveL.rotation.set(Math.PI / 2 - 0.5, 0, -0.5);
+  vmParts.sleeves = [sleeveR.material, sleeveL.material];
+  // pod de recarga (aparece na animação de despejo)
+  const pod = add(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 16), M(0x0f5e58, { roughness: .4 }), -0.12, 0.35, 0.05, vm); pod.visible = false; vmParts.pod = pod;
+  // granada na mão (animação de arremesso)
+  const gn = add(new THREE.SphereGeometry(0.045, 16, 12), new THREE.MeshStandardMaterial({ color: 0xff2e88, roughness: .4 }), -0.18, -0.05, -0.2, vm); gn.visible = false; vmParts.nade = gn;
   vm.position.set(0.22, -0.2, -0.35);
-  vm.scale.setScalar(0.42);
-  vm.traverse(o => { if (o.isMesh) o.renderOrder = 10; });
+  vm.scale.setScalar(0.34);
+  vm.traverse(o => { if (o.isMesh) { o.renderOrder = 10; o.castShadow = false; } });
 })();
-let bob = 0;
+let throwAnim = 0;
+function animateViewModel(dt) {
+  if (!player) return;
+  const t = now();
+  // cor da manga = time do jogador
+  const c = TEAMS[player.team].jersey;
+  for (const m of vmParts.sleeves) if (m.color.getHex() !== c) m.color.setHex(c);
+  // bolas no loader proporcionais ao que sobrou, com chacoalho a cada tiro
+  const show = Math.round(clamp(player.hopper / 200, 0, 1) * vmParts.balls.children.length);
+  vmParts.balls.children.forEach((b, i) => { b.visible = i < show; const j = kick * 0.006; b.position.set(b.userData.base.x + (Math.random() - .5) * j, b.userData.base.y + (Math.random() - .5) * j, b.userData.base.z + (Math.random() - .5) * j); });
+  vmParts.finger.position.z = -0.06 + kick * 0.012;
+  // despejo do pod: arma inclina, pod entra no loader
+  const g = vmParts.gun;
+  if (player.pendingPod) {
+    const k = clamp((t - player.reloadStart) / 1.8, 0, 1), s = Math.sin(k * Math.PI);
+    g.rotation.set(-0.35 * s, 0, 0.55 * s); g.position.set(0, -0.05 * s, 0);
+    vmParts.pod.visible = true; vmParts.pod.position.set(-0.1 + 0.08 * k, 0.4 - 0.2 * s, -0.02); vmParts.pod.rotation.z = -1.2 * s;
+  } else { g.rotation.set(0, 0, 0); g.position.set(0, 0, 0); vmParts.pod.visible = false; }
+  // arremesso de granada
+  throwAnim = Math.max(0, throwAnim - dt * 2.6);
+  const ta = Math.sin(clamp(throwAnim, 0, 1) * Math.PI);
+  vmParts.nade.visible = throwAnim > 0.45;
+  vmParts.nade.position.set(-0.2 - ta * 0.1, -0.05 + ta * 0.25, -0.15 - ta * 0.2);
+  g.position.y -= ta * 0.12; g.rotation.x += ta * 0.25;
+}
+let bob = 0, camRoll = 0;
 
 // ---------------- HUD ----------------
 const el = id => document.getElementById(id);
@@ -974,7 +1236,7 @@ function addFeed(by, victim, part) {
   if (by.isPlayer || victim.isPlayer) d.className = 'me';
   const sp = (txt, color) => { const x = document.createElement('span'); x.textContent = txt; x.style.color = color; return x; };
   const splat = document.createElement('i'); splat.className = 'splat'; splat.style.background = TEAMS[by.team].paintCss;
-  const em = document.createElement('em'); em.textContent = part === 'head' ? 'MÁSCARA' : part === 'torso' ? 'CORPO' : 'PERNA';
+  const em = document.createElement('em'); em.textContent = part === 'nade' ? 'GRANADA' : part === 'head' ? 'MÁSCARA' : part === 'torso' ? 'CORPO' : 'PERNA';
   d.append(sp(by.name, TEAMS[by.team].css), splat, sp(victim.name, TEAMS[victim.team].css), em);
   el('feed').prepend(d);
   setTimeout(() => d.remove(), 5000);
@@ -992,8 +1254,7 @@ function renderHud() {
   el('scoreA').textContent = dm ? S.stats.elims : S.scoreA; el('scoreB').textContent = dm ? S.stats.outs : S.scoreB;
   el('tnA').textContent = dm ? 'ABATES' : 'AZUL'; el('tnB').textContent = dm ? 'MORTES' : 'VERMELHO';
   if (S.mode === 'online') {
-    const sc = net.teamScores();
-    el('scoreA').textContent = sc.A; el('scoreB').textContent = sc.B;
+    el('scoreA').textContent = net.round.A; el('scoreB').textContent = net.round.B;
     el(player.team === 'A' ? 'tnA' : 'tnB').textContent += ' · VOCÊ';
   }
   el('pipsA').hidden = el('pipsB').hidden = dm;
@@ -1003,9 +1264,11 @@ function renderHud() {
   if (!el('board').hidden) net.renderBoard();
   const left = S.phase === 'live' ? Math.max(0, LIMIT - (now() - S.roundStart)) : S.phase === 'countdown' ? LIMIT : Math.max(0, LIMIT - (S.lastLiveTime || 0));
   const m = Math.floor(left / 60), s = Math.floor(left % 60);
-  el('clock').textContent = S.mode === 'online' ? `${net.humanCount()} NA SALA` : `${m}:${String(s).padStart(2, '0')}`; el('clock').classList.toggle('hot', left < 20 && S.phase === 'live');
+  el('clock').textContent = S.mode === 'online' ? net.clockText() : `${m}:${String(s).padStart(2, '0')}`; el('clock').classList.toggle('hot', left < 20 && S.phase === 'live');
   if (dm && !player.alive && player.respawnAt) { el('bannerSub').textContent = `VOLTA EM ${Math.max(0, player.respawnAt - now()).toFixed(1)} s`; }
   el('hopper').textContent = player.hopper; el('hopper').classList.toggle('low', player.hopper < 30);
+  const nb = el('nades'); if (nb.children.length !== NADES_PER_LIFE) nb.innerHTML = '<i class="nade"></i>'.repeat(NADES_PER_LIFE);
+  [...nb.children].forEach((x, i) => x.classList.toggle('used', i >= (player.nades ?? NADES_PER_LIFE)));
   const pods = el('pods'); if (pods.children.length !== 4) pods.innerHTML = '<i class="pod"></i>'.repeat(4);
   [...pods.children].forEach((p, i) => p.classList.toggle('empty', i >= player.pods));
   const rb = el('reloadbar'); rb.style.width = player.pendingPod ? `${clamp((now() - player.reloadStart) / 1.8, 0, 1) * 100}%` : '0%';
@@ -1077,8 +1340,12 @@ function updateCamera(dt) {
     const sp = Math.hypot(player.vel.x, player.vel.z);
     bob += sp * dt * 1.8;
     kick *= Math.pow(0.001, dt);
-    vm.position.set(0.13 + Math.cos(bob) * 0.004 * sp / 5, -0.12 + Math.abs(Math.sin(bob)) * 0.005 * sp / 5, -0.24 + kick * 0.015);
-    vm.rotation.x = kick * 0.05;
+    const sliding = player.slideUntil > now();
+    vm.position.set(0.12 + Math.cos(bob) * 0.004 * sp / 5, -0.105 + Math.abs(Math.sin(bob)) * 0.005 * sp / 5 - (sliding ? 0.02 : 0), -0.2 + kick * 0.02);
+    vm.rotation.set(kick * 0.08, 0, sliding ? 0.25 : 0);
+    camRoll += ((sliding ? -0.09 : 0) - camRoll) * Math.min(1, dt * 10);
+    camera.rotation.z = camRoll;
+    animateViewModel(dt);
   } else {
     vm.visible = false;
     const tgt = new V3(0, 17, 31);
@@ -1127,6 +1394,7 @@ function step(dt) {
   for (const a of actors) if (a.alive && !a.remote) integrate(a, dt);
   separateActors();
   updateBalls(dt);
+  updateNades(dt);
   for (const a of actors) updateBody(a, dt);
   updateCamera(dt);
   renderHud();
@@ -1136,6 +1404,8 @@ requestAnimationFrame(frame);
 // ---------------- input ----------------
 addEventListener('keydown', e => {
   if (S.phase === 'menu' || S.phase === 'over' || S.paused) return;
+  if (!e.repeat && (e.code === 'KeyC' || e.code === 'ControlLeft')) slideReq = true;
+  if (!e.repeat && e.code === 'KeyG') nadeReq = true;
   keys.add(e.code);
   if (e.code === 'Tab') e.preventDefault();
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyC'].includes(e.code) || e.ctrlKey) e.preventDefault();
@@ -1146,7 +1416,7 @@ addEventListener('blur', () => { keys.clear(); mouseDown = false; });
 canvas.addEventListener('mousedown', e => {
   if (S.paused) return;
   audioInit();
-  if (e.button === 0) mouseDown = true;
+  if (e.button === 0) { mouseDown = true; triggerAt = now(); }
   if (e.button === 2) dragLook = true;
   if (!locked && !lookFallback) requestLock();
 });
@@ -1182,7 +1452,7 @@ function cleanName(s) { return String(s || '').replace(/[\u0000-\u001f\u007f-\u0
 const r2 = v => Math.round(v * 100) / 100;
 const net = {
   room: null, status: 'connecting', me: null, joined: false, name: '', shots: [],
-  lastPresence: 0, lastFlush: 0, host: false, remotes: new Map(), bots: [], botSeq: 0,
+  lastPresence: 0, lastFlush: 0, host: false, remotes: new Map(), bots: [], botSeq: 0, beats: new Map(),
 
   joinedPeers() { return this.room ? this.room.peers().filter(p => p.presence && typeof p.presence.n === 'string' && (p.presence.t === 'A' || p.presence.t === 'B')) : []; },
   humanCount() { return this.joinedPeers().length || (this.joined ? 1 : 0); },
@@ -1196,14 +1466,76 @@ const net = {
     for (const a of actors) if (a.team in sc) sc[a.team] += a.isPlayer ? S.stats.elims : (a.kills || 0);
     return sc;
   },
+  round: { n: 0, ph: 'wait', end: 0, A: 0, B: 0, win: '' }, seenN: 0, lastPh: 'wait', hostPeer: null,
+  clockText() {
+    const R = this.round, left = Math.max(0, (R.end - performance.now()) / 1000);
+    if (R.ph === 'wait') return `AQUECIMENTO · ${this.humanCount()} NA SALA`;
+    if (R.ph === 'countdown') return `PONTO ${R.n} EM ${Math.ceil(left)}`;
+    if (R.ph === 'post') return 'FIM DO PONTO';
+    return `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} · PONTO ${R.n}`;
+  },
+  teamCounts() {
+    const c = { A: { n: 0, alive: 0 }, B: { n: 0, alive: 0 } };
+    c[player.team].n++; if (player.alive) c[player.team].alive++;
+    for (const a of this.remotes.values()) { if (a.isBotRemote || !(a.team in c)) continue; c[a.team].n++; if (a.alive) c[a.team].alive++; }
+    return c;
+  },
+  hostRound() {
+    const R = this.round, t = performance.now(), c = this.teamCounts();
+    if (!(c.A.n > 0 && c.B.n > 0)) { if (R.ph !== 'wait') { R.ph = 'wait'; R.end = 0; } return; }
+    if (R.ph === 'wait') { R.n++; R.ph = 'countdown'; R.end = t + 4000; R.win = ''; return; }
+    if (R.ph === 'countdown' && t >= R.end) { R.ph = 'live'; R.end = t + ROUND_TIME * 1000; return; }
+    if (R.ph === 'live') {
+      const a = c.A.alive, b = c.B.alive; let w = null;
+      if (a === 0 && b === 0) w = 'tie'; else if (b === 0) w = 'A'; else if (a === 0) w = 'B';
+      else if (t >= R.end) w = a > b ? 'A' : b > a ? 'B' : 'tie';
+      if (w) { if (w !== 'tie') R[w]++; R.ph = 'post'; R.end = t + 4000; R.win = w; }
+      return;
+    }
+    if (R.ph === 'post' && t >= R.end) { R.n++; R.ph = 'countdown'; R.end = t + 4000; R.win = ''; }
+  },
+  readRound() {
+    // segue o estado de ponto publicado pelo anfitrião (menor id da sala)
+    const hp = this.joinedPeers().find(p => p.peer === this.hostPeer && !p.sameTab);
+    const r = hp && hp.presence && Array.isArray(hp.presence.r) ? hp.presence.r : null;
+    if (!r || r.length < 5 || !['wait', 'countdown', 'live', 'post'].includes(r[1]) || ![r[0], r[2], r[3], r[4]].every(Number.isFinite)) return;
+    const R = this.round;
+    R.n = r[0] | 0; R.ph = r[1]; R.end = performance.now() + Math.max(0, Math.min(r[2], ROUND_TIME * 1000 + 5000)); R.A = r[3] | 0; R.B = r[4] | 0; R.win = r[5] === 'A' || r[5] === 'B' ? r[5] : '';
+  },
+  followRound() {
+    const R = this.round, p = player;
+    if (R.ph === 'countdown' && R.n !== this.seenN) {
+      this.seenN = R.n;
+      for (const B of balls) scene.remove(B.mesh); balls.length = 0;
+      respawn(p); p.frozen = true; p.spawnUntil = 0; spectate = false;
+      showBanner(`PONTO ${R.n}`, `AZUL ${R.A} × ${R.B} VERMELHO · PREPARE-SE`, 3.8); sfx.beep();
+    }
+    if (R.ph === 'live' && this.lastPh !== 'live') { p.frozen = false; if (p.alive) { showBanner('VAI!', 'BREAK — CORRA PARA UM BUNKER', 1); sfx.horn(); } }
+    if (R.ph === 'post' && this.lastPh !== 'post') {
+      p.frozen = false;
+      const txt = R.win ? `PONTO ${TEAMS[R.win].name}` : 'EMPATE';
+      showBanner(txt, R.win === p.team ? 'SEU TIME LEVOU ESSA' : R.win ? 'O OUTRO TIME LEVOU ESSA' : 'NINGUÉM SOBROU', 3.6); sfx.horn();
+    }
+    if (R.ph === 'wait') {
+      p.frozen = false;
+      if (this.lastPh !== 'wait') { showBanner('AQUECIMENTO', 'ESPERANDO ALGUÉM NO OUTRO TIME', 2.5); if (!p.alive) p.respawnAt = now() + 1; }
+    }
+    this.lastPh = R.ph;
+  },
   start() {
-    this.joined = true; this.host = false; this.bots = [];
+    this.joined = true; this.host = false; this.bots = []; this.seenN = 0; this.lastPh = 'wait';
     for (const B of balls) scene.remove(B.mesh); balls.length = 0;
     for (const b of bunkers) b.occupied = null;
     player.key = this.me || player.key;
     respawn(player);
     S.phase = 'live'; S.roundStart = now();
-    showBanner(`TIME ${TEAMS[player.team].name}`, `${this.name} ENTROU NA SALA`, 2.2);
+    this.readRound();
+    if (this.round.ph === 'live' || this.round.ph === 'post') {
+      // chegou no meio de um ponto: assiste até o próximo
+      this.seenN = this.round.n; this.lastPh = this.round.ph;
+      player.alive = false; player.respawnAt = 0; spectate = true;
+      showBanner(`TIME ${TEAMS[player.team].name}`, 'PONTO EM ANDAMENTO · VOCÊ ENTRA NO PRÓXIMO', 999);
+    } else showBanner(`TIME ${TEAMS[player.team].name}`, `${this.name} ENTROU NA SALA`, 2.2);
     sfx.horn();
     this.sendPresence(true);
   },
@@ -1230,8 +1562,10 @@ const net = {
     const p = player;
     const patch = {
       n: this.name, t: p.team,
-      s: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), r2(p.crouch), p.alive ? 1 : 0, S.stats.elims, S.stats.outs, p.spawnUntil > now() ? 1 : 0],
-      b: this.host ? this.bots.map(b => [b.botId, b.team, b.name, r2(b.pos.x), r2(b.pos.y), r2(b.pos.z), r2(b.yaw), r2(b.pitch), r2(b.crouch), b.alive ? 1 : 0, b.kills || 0]) : null,
+      s: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), r2(p.crouch), p.alive ? 1 : 0, S.stats.elims, S.stats.outs, p.spawnUntil > now() ? 1 : 0, Math.floor(performance.now() / 250) % 100000],
+      away: document.hidden ? 1 : null,
+      r: this.host ? [this.round.n, this.round.ph, Math.round(Math.max(0, this.round.end - performance.now())), this.round.A, this.round.B, this.round.win || ''] : null,
+      b: false && this.host ? this.bots.map(b => [b.botId, b.team, b.name, r2(b.pos.x), r2(b.pos.y), r2(b.pos.z), r2(b.yaw), r2(b.pitch), r2(b.crouch), b.alive ? 1 : 0, b.kills || 0]) : null,
     };
     this.room.presence(patch).catch(() => {});
   },
@@ -1254,7 +1588,7 @@ const net = {
     }
     a.name = name; a.kills = st.k; a.deaths = st.d; a.seen = true;
     a.target.set(st.x, st.y, st.z); a.tYaw = st.yaw; a.tPitch = st.pitch; a.tCrouch = st.crouch; a.shield = st.shield;
-    if (st.alive && !a.alive && now() > (a.deadLock || 0)) { // voltou (respawn)
+    if (st.alive && !a.alive && performance.now() > (a.deadLock || 0)) { // voltou (respawn)
       a.alive = true; a.pos.copy(a.target); a.yaw = a.tYaw; a.outAt = 0;
       a.body.root.visible = true; a.body.arms.rotation.set(0, 0, 0);
       const stale = []; a.body.root.traverse(o => { if (o.userData.paint) stale.push(o); }); for (const o of stale) o.parent.remove(o);
@@ -1265,10 +1599,17 @@ const net = {
     for (const p of this.joinedPeers()) {
       if (p.sameTab) continue;
       const pr = p.presence, s = Array.isArray(pr.s) ? pr.s : null;
+      if (pr.away) continue;
+      if (s) {
+        const beat = s[10];
+        const prev = this.beats.get(p.peer);
+        if (!prev || prev.v !== beat) this.beats.set(p.peer, { v: beat, at: performance.now() });
+        else if (performance.now() - prev.at > 3000) continue; // travado: aba pausada ou conexão ruim
+      }
       if (s && s.length >= 9 && s.slice(0, 6).every(Number.isFinite)) {
         this.upsertRemote(p.peer, pr.t, cleanName(pr.n) || 'JOGADOR', { x: s[0], y: s[1], z: s[2], yaw: s[3], pitch: s[4], crouch: clamp(s[5], 0, 1), alive: !!s[6], k: s[7] | 0, d: s[8] | 0, shield: !!s[9] }, false);
       }
-      if (Array.isArray(pr.b)) for (const b of pr.b.slice(0, 12)) {
+      if (false && Array.isArray(pr.b)) for (const b of pr.b.slice(0, 12)) {
         if (!Array.isArray(b) || b.length < 11 || (b[1] !== 'A' && b[1] !== 'B') || !b.slice(3, 9).every(Number.isFinite)) continue;
         this.upsertRemote(p.peer + '~' + b[0], b[1], cleanName(b[2]) || 'BOT', { x: b[3], y: b[4], z: b[5], yaw: b[6], pitch: b[7], crouch: clamp(b[8], 0, 1), alive: !!b[9], k: b[10] | 0, d: 0 }, true);
       }
@@ -1289,6 +1630,7 @@ const net = {
     const ids = this.joinedPeers().map(p => p.peer);
     if (this.me && !ids.includes(this.me)) ids.push(this.me);
     ids.sort();
+    this.hostPeer = ids[0];
     const host = ids[0] === this.me;
     if (host !== this.host) {
       this.host = host;
@@ -1296,6 +1638,10 @@ const net = {
     }
   },
   balanceBots() {
+    // online é só entre pessoas: nenhum bot entra na sala
+    for (const b of this.bots) { scene.remove(b.body.root); const i = actors.indexOf(b); if (i >= 0) actors.splice(i, 1); if (b.bunker) b.bunker.occupied = null; }
+    this.bots = [];
+    return;
     const humans = { A: 0, B: 0 };
     for (const p of this.joinedPeers()) if (!p.sameTab) humans[p.presence.t]++;
     humans[player.team]++;
@@ -1320,8 +1666,10 @@ const net = {
     if (!this.joined || !this.room) return;
     if (this.me && player.key !== this.me) player.key = this.me;
     this.electHost();
-    if (this.host) { this.balanceBots(); for (const b of this.bots) b.key = this.me + '~' + b.botId; }
+    if (this.host) this.balanceBots();
     this.syncRemotes(dt);
+    if (this.host) this.hostRound(); else this.readRound();
+    this.followRound();
     this.sendPresence(false);
     this.flushShots();
   },
@@ -1338,26 +1686,41 @@ const net = {
       sfx.shot(pos, false);
     }
   },
+  onNade(msg) {
+    if (msg.sameTab || !this.joined || !msg.data) return;
+    const d = msg.data;
+    if (!Array.isArray(d.o) || !Array.isArray(d.v) || ![...d.o, ...d.v].every(Number.isFinite) || (d.t !== 'A' && d.t !== 'B')) return;
+    const owner = actors.find(a => a.key === d.k) || { key: String(d.k), team: d.t, name: '?' };
+    throwNade(owner, new V3(...d.o), new V3(...d.v), String(d.i).slice(0, 40));
+  },
+  onBoom(msg) {
+    if (msg.sameTab || !this.joined || !msg.data) return;
+    const d = msg.data;
+    if (![d.x, d.y, d.z].every(Number.isFinite) || (d.t !== 'A' && d.t !== 'B')) return;
+    const i = nades.findIndex(n => n.id === String(d.i)); if (i >= 0) { scene.remove(nades[i].mesh); nades.splice(i, 1); }
+    const owner = actors.find(a => a.key === d.k) || { key: String(d.k), team: d.t, name: '?', isPlayer: false };
+    explodeNade(new V3(d.x, d.y, d.z), d.t, owner, true);
+  },
   onOut(msg) {
     if (msg.sameTab || !this.joined || !msg.data) return;
     const d = msg.data;
     const victim = actors.find(a => a.key === d.v);
     const killer = actors.find(a => a.key === d.k) || { key: String(d.k), team: victim ? (victim.team === 'A' ? 'B' : 'A') : 'A', name: '?', isPlayer: false };
-    const part = ['head', 'torso', 'pernas'].includes(d.p) ? d.p : 'torso';
+    const part = ['head', 'torso', 'pernas', 'nade'].includes(d.p) ? d.p : 'torso';
     if (victim && victim.remote && victim.alive) {
-      victim.alive = false; victim.outAt = now(); victim.deadLock = now() + 1.2;
+      victim.alive = false; victim.outAt = now(); victim.deadLock = performance.now() + 1200;
       if ([d.x, d.y, d.z].every(Number.isFinite) && victim.body) {
         const pt = new V3(d.x, d.y, d.z), n = pt.clone().sub(victim.pos).setY(0).normalize();
         const dec = addDecal(pt, n.lengthSq() ? n : new V3(0, 0, 1), TEAMS[killer.team].paint, part === 'head' ? 0.22 : 0.3, victim.body.root); dec.userData.paint = true;
       }
       addFeed(killer, victim, part);
     }
-    if (killer.isPlayer) { S.stats.elims++; S.stats.hits++; if (part === 'head') S.stats.heads++; hitMarker(); sfx.hit(); }
+    if (killer.isPlayer) { S.stats.elims++; S.stats.hits++; if (part === 'head') S.stats.heads++; hitMarker(); sfx.hit(); onPlayerElim(part); }
     else if (killer.auth && this.bots.includes(killer)) killer.kills = (killer.kills || 0) + 1;
   },
   renderBoard() {
     const box = el('board'); box.textContent = '';
-    const sc = this.teamScores();
+    const sc = { A: this.round.A, B: this.round.B };
     for (const t of ['A', 'B']) {
       const col = document.createElement('div');
       const h = document.createElement('h3'); h.style.color = TEAMS[t].css;
@@ -1384,10 +1747,10 @@ function renderRoomLine() {
   else {
     const ps = net.joinedPeers().filter(p => !p.sameTab);
     const a = ps.filter(p => p.presence.t === 'A').length, b = ps.filter(p => p.presence.t === 'B').length;
-    small.textContent = ps.length ? `${ps.length} jogando agora` : 'sala vazia · bots completam';
+    small.textContent = ps.length ? `${ps.length} jogando agora` : 'sala vazia';
     el('roomLine').innerHTML = '';
     const bA = document.createElement('b'); bA.textContent = a; const bB = document.createElement('b'); bB.textContent = b;
-    el('roomLine').append(ps.length ? 'Na sala: ' : 'Ninguém jogando ainda. ', ...(ps.length ? [bA, ' azul · ', bB, ' vermelho'] : ['Os bots seguram até alguém chegar.']));
+    el('roomLine').append(ps.length ? 'Na sala: ' : 'Ninguém jogando ainda. ', ...(ps.length ? [bA, ' azul · ', bB, ' vermelho'] : ['Entre e espere alguém chegar.']));
   }
   if (!menu.hidden) refreshMenu();
 }
@@ -1452,6 +1815,8 @@ function createWsRoom(url) {
   net.room = room; net.status = 'on'; net.why = null;
   room.onPeers(ch => { const me = ch.peers.find(p => p.sameTab); if (me) net.me = me.peer; renderRoomLine(); });
   room.on('shot', m => net.onShot(m));
+  room.on('nade', m => net.onNade(m));
+  room.on('boom', m => net.onBoom(m));
   room.on('out', m => net.onOut(m));
   let lostAt = 0;
   room.onConnection(c => {
@@ -1461,6 +1826,8 @@ function createWsRoom(url) {
   });
   renderRoomLine();
 })();
+
+document.addEventListener('visibilitychange', () => { if (net.joined) net.sendPresence(true); });
 
 // nomes acima dos colegas de time
 const tagCanvas = el('tags'), tctx = tagCanvas.getContext('2d');
@@ -1499,7 +1866,8 @@ function refreshMenu() {
   const on = S.mode === 'online';
   if (S.phase !== 'over') el('rules').innerHTML = RULES[S.mode];
   el('nameRow').hidden = !on;
-  el('diffLabel').textContent = on ? 'NÍVEL DOS BOTS QUE COMPLETAM OS TIMES' : S.mode === 'dm' ? 'NÍVEL DOS BOTS' : 'NÍVEL DO TIME ADVERSÁRIO';
+  el('diffRow').hidden = on;
+  el('diffLabel').textContent = S.mode === 'dm' ? 'NÍVEL DOS BOTS' : 'NÍVEL DO TIME ADVERSÁRIO';
   el('startLabel').textContent = playing ? (on ? 'VOLTAR AO JOGO' : 'CONTINUAR') : on ? 'ENTRAR NA SALA' : S.mode === 'dm' ? 'COMEÇAR TREINO' : 'ENTRAR NO CAMPO';
   el('restart').hidden = !playing;
   el('restart').textContent = on ? 'Sair da sala' : 'Reiniciar partida';
@@ -1602,6 +1970,6 @@ for (let i = 0; i < 70; i++) {
 decals.length = 0; // os decorativos não entram no limite nem são limpos
 S.phase = 'menu';
 // acesso de depuração (o jogo é single-player)
-if (new URLSearchParams(location.search).has('debug')) window.__splat = { S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers };
+if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, explodeNade, worldHit };
 })();
 </script>
