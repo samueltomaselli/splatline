@@ -57,7 +57,7 @@ wss.on('connection', ws => {
   ws.on('message', raw => {
     // limite simples: ~60 mensagens/s por jogador, rajada de 120
     const now = Date.now();
-    peer.tokens = Math.min(120, peer.tokens + (now - peer.last) * 0.06); peer.last = now;
+    peer.tokens = Math.min(200, peer.tokens + (now - peer.last) * 0.06); peer.last = now;
     if (peer.tokens < 1) return;
     peer.tokens -= 1;
 
@@ -71,7 +71,13 @@ wss.on('connection', ws => {
       broadcast({ t: 'presence', peer: id, presence: next }, id);
     } else if (m.t === 'event' && TOPICS.has(m.topic)) {
       if (Buffer.byteLength(JSON.stringify(m.data ?? null)) > MAX_EVENT_BYTES) return;
-      broadcast({ t: 'event', topic: m.topic, data: m.data, peer: id }, id);
+      broadcast({ t: 'event', topic: m.topic, data: m.data, id: typeof m.id === 'string' ? m.id.slice(0, 40) : undefined, peer: id }, id);
+    } else if (m.t === 'signal' && typeof m.to === 'string' && peers.has(m.to) && isPlainObject(m.data)) {
+      // apresenta os navegadores para a conexão direta (WebRTC)
+      if (Buffer.byteLength(JSON.stringify(m.data)) > 16000) return;
+      const target = peers.get(m.to);
+      const out = JSON.stringify({ t: 'signal', from: id, data: m.data });
+      if (target.ws.readyState === 1) (LAG_MS ? setTimeout(() => target.ws.send(out), LAG_MS) : target.ws.send(out));
     }
   });
   ws.on('close', () => { peers.delete(id); broadcast({ t: 'leave', peer: id }); });

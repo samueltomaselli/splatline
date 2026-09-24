@@ -1768,6 +1768,7 @@ const net = {
       for (const { a, k, d } of rows) {
         const tr = document.createElement('tr'); if (a.isPlayer) tr.className = 'me'; if (!a.alive) tr.classList.add('dead');
         const tn = document.createElement('td'); tn.textContent = a.name;
+        if (a.remote && this.room && this.room.links) { const L = this.room.links().find(l => l.peer === a.key); const bt = document.createElement('span'); bt.className = 'bot'; bt.textContent = L && L.direct ? (L.rtt ? `DIRETO ${Math.round(L.rtt)} ms` : 'DIRETO') : 'VIA SERVIDOR'; tn.append(bt); }
         if (a.isBotRemote || (a.auth && !a.isPlayer)) { const bt = document.createElement('span'); bt.className = 'bot'; bt.textContent = 'BOT'; tn.append(bt); }
         const tk = document.createElement('td'); tk.className = 'n'; tk.textContent = k;
         const td = document.createElement('td'); td.className = 'n'; td.textContent = (a.isBotRemote || (a.auth && !a.isPlayer)) ? '–' : d;
@@ -1795,14 +1796,82 @@ function renderRoomLine() {
 // então o resto do jogo não muda. Use ?server=wss://seu-servidor/ws para apontar outro servidor.
 const SERVER_URL = new URLSearchParams(location.search).get('server') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 function createWsRoom(url) {
+  // Sala: o servidor apresenta os jogadores e guarda o estado de quem entra;
+  // o jogo em si trafega direto entre os navegadores (WebRTC) sempre que der.
   const topicFns = {}, peerFns = [], connFns = [];
   let ws = null, me = null, open = false, mine = {}, peerMap = new Map(), snap = Object.freeze([]), backoff = 500, readyResolve;
   const ready = new Promise(r => { readyResolve = r; });
+  const lastQ = new Map(), seenEv = new Set(), seenOrder = [];
+  let q = 0, evSeq = 0, lastServerPresence = 0;
+  const links = new Map(); // peer -> { pc, u, r, direct, rtt }
+  const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
   const rebuild = () => {
     snap = Object.freeze([...peerMap].map(([peer, presence]) => Object.freeze({ peer, presence: Object.freeze({ ...presence }), sameTab: peer === me, isMe: peer === me, kind: 'viewer', guest: false, by: null, updatedAt: Date.now() })));
   };
   const notify = () => { rebuild(); for (const f of peerFns) f({ peers: snap, joined: [], left: [], updated: [] }); };
   const send = m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
+  const others = () => [...peerMap.keys()].filter(k => k !== me);
+  const allDirect = () => others().every(k => links.get(k)?.direct);
+
+  function applyPresence(peer, pres, qq) {
+    if (!peerMap.has(peer)) return;
+    if (Number.isFinite(qq) && qq <= (lastQ.get(peer) || -1)) return; // já tenho um mais novo
+    if (Number.isFinite(qq)) lastQ.set(peer, qq);
+    peerMap.set(peer, pres); notify();
+  }
+  function deliverEvent(peer, topic, data, id) {
+    if (id) { if (seenEv.has(id)) return; seenEv.add(id); seenOrder.push(id); if (seenOrder.length > 600) seenEv.delete(seenOrder.shift()); }
+    for (const f of topicFns[topic] || []) f({ topic, data, peer, sameTab: false, isMe: false, kind: 'viewer', guest: false, by: null });
+  }
+
+  // ---- WebRTC ----
+  function closeLink(peer) { const L = links.get(peer); if (!L) return; try { L.pc.close(); } catch {} links.delete(peer); }
+  function wireChannel(peer, L, ch) {
+    ch.onopen = () => { if (L.u?.readyState === 'open' && L.r?.readyState === 'open') { L.direct = true; lastServerPresence = 0; } };
+    ch.onclose = () => { L.direct = false; };
+    ch.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.t === 'p' && m.p && typeof m.p === 'object') {
+        const cur = { ...(peerMap.get(peer) || {}) };
+        for (const k in m.p) { if (m.p[k] === null) delete cur[k]; else cur[k] = m.p[k]; }
+        applyPresence(peer, cur, m.q);
+      } else if (m.t === 'e' && typeof m.topic === 'string') deliverEvent(peer, m.topic, m.data, m.id);
+      else if (m.t === 'ping') { try { L.u.send(JSON.stringify({ t: 'pong', at: m.at })); } catch {} }
+      else if (m.t === 'pong' && Number.isFinite(m.at)) L.rtt = performance.now() - m.at;
+    };
+  }
+  function makeLink(peer, initiator) {
+    closeLink(peer);
+    if (typeof RTCPeerConnection !== 'function') return;
+    const pc = new RTCPeerConnection({ iceServers: ICE });
+    const L = { pc, u: null, r: null, direct: false, rtt: null };
+    links.set(peer, L);
+    pc.onicecandidate = e => { if (e.candidate) send({ t: 'signal', to: peer, data: { c: e.candidate } }); };
+    pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState)) L.direct = false; };
+    if (initiator) {
+      L.u = pc.createDataChannel('u', { ordered: false, maxRetransmits: 0 }); wireChannel(peer, L, L.u);
+      L.r = pc.createDataChannel('r', { ordered: true }); wireChannel(peer, L, L.r);
+      pc.createOffer().then(o => pc.setLocalDescription(o)).then(() => send({ t: 'signal', to: peer, data: { d: pc.localDescription } })).catch(() => {});
+    } else {
+      pc.ondatachannel = e => { const ch = e.channel; if (ch.label === 'u') L.u = ch; else L.r = ch; wireChannel(peer, L, ch); };
+    }
+    // se não conectar direto em 8 s, segue pelo servidor
+    setTimeout(() => { if (links.get(peer) === L && !L.direct) closeLink(peer); }, 8000);
+  }
+  async function onSignal(from, data) {
+    if (!data || !peerMap.has(from)) return;
+    let L = links.get(from);
+    if (data.d) {
+      if (data.d.type === 'offer') { makeLink(from, false); L = links.get(from); if (!L) return; }
+      if (!L) return;
+      try {
+        await L.pc.setRemoteDescription(data.d);
+        if (data.d.type === 'offer') { const a = await L.pc.createAnswer(); await L.pc.setLocalDescription(a); send({ t: 'signal', to: from, data: { d: L.pc.localDescription } }); }
+      } catch {}
+    } else if (data.c && L) { try { await L.pc.addIceCandidate(data.c); } catch {} }
+  }
+  setInterval(() => { for (const L of links.values()) if (L.direct) try { L.u.send(JSON.stringify({ t: 'ping', at: performance.now() })); } catch {} }, 2000);
+
   function connect() {
     try { ws = new WebSocket(url); } catch { setTimeout(connect, backoff = Math.min(backoff * 2, 8000)); return; }
     ws.onopen = () => { backoff = 500; };
@@ -1812,16 +1881,20 @@ function createWsRoom(url) {
         me = m.me; open = true;
         peerMap = new Map((m.peers || []).map(p => [p.peer, p.presence || {}]));
         peerMap.set(me, { ...mine });
-        if (Object.keys(mine).length) send({ t: 'presence', patch: mine });
+        if (Object.keys(mine).length) send({ t: 'presence', patch: { ...mine, _q: q } });
+        // quem chega puxa conexão direta com todo mundo que já está na sala
+        for (const p of others()) makeLink(p, true);
         notify(); for (const f of connFns) f(true); readyResolve(true);
       } else if (m.t === 'join') { if (!peerMap.has(m.peer)) peerMap.set(m.peer, {}); notify(); }
-      else if (m.t === 'presence') { peerMap.set(m.peer, m.presence || {}); notify(); }
-      else if (m.t === 'leave') { peerMap.delete(m.peer); notify(); }
-      else if (m.t === 'event') { for (const f of topicFns[m.topic] || []) f({ topic: m.topic, data: m.data, peer: m.peer, sameTab: false, isMe: false, kind: 'viewer', guest: false, by: null }); }
+      else if (m.t === 'presence') { applyPresence(m.peer, m.presence || {}, m.presence && m.presence._q); }
+      else if (m.t === 'leave') { peerMap.delete(m.peer); lastQ.delete(m.peer); closeLink(m.peer); notify(); }
+      else if (m.t === 'event') deliverEvent(m.peer, m.topic, m.data, m.id);
+      else if (m.t === 'signal') onSignal(m.from, m.data);
       else if (m.t === 'full') { for (const f of connFns) f(false); }
     };
     ws.onclose = () => {
       const was = open; open = false; me = null;
+      for (const k of [...links.keys()]) closeLink(k);
       if (was) for (const f of connFns) f(false);
       setTimeout(connect, backoff = Math.min(backoff * 2, 8000));
     };
@@ -1831,12 +1904,24 @@ function createWsRoom(url) {
     ready,
     peers: () => snap,
     connected: () => open,
+    links: () => [...links.entries()].map(([peer, L]) => ({ peer, direct: L.direct, rtt: L.rtt })),
     async presence(patch) {
       for (const k in patch) { if (patch[k] === null) delete mine[k]; else mine[k] = patch[k]; }
       if (me) { peerMap.set(me, { ...mine }); rebuild(); }
-      send({ t: 'presence', patch });
+      q++;
+      const msg = JSON.stringify({ t: 'p', p: patch, q });
+      for (const L of links.values()) if (L.direct) try { L.u.send(msg); } catch {}
+      // o servidor guarda o estado para quem entrar depois; se todos estão
+      // conectados direto, ele recebe só 4 vezes por segundo
+      const t = performance.now();
+      if (!allDirect() || t - lastServerPresence > 250) { lastServerPresence = t; send({ t: 'presence', patch: { ...mine, _q: q } }); }
     },
-    async emit(topic, data) { send({ t: 'event', topic, data }); },
+    async emit(topic, data) {
+      const id = me + ':' + (++evSeq);
+      const msg = JSON.stringify({ t: 'e', topic, data, id });
+      for (const L of links.values()) if (L.direct) try { L.r.send(msg); } catch {}
+      if (!allDirect()) send({ t: 'event', topic, data, id });
+    },
     on(topic, fn) { (topicFns[topic] = topicFns[topic] || []).push(fn); return () => { topicFns[topic] = topicFns[topic].filter(x => x !== fn); }; },
     onPeers(fn) { peerFns.push(fn); setTimeout(() => fn({ peers: snap, joined: snap, left: [], updated: [] }), 0); return () => {}; },
     onConnection(fn) { connFns.push(fn); setTimeout(() => fn(open), 0); return () => {}; },
