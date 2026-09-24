@@ -1079,6 +1079,7 @@ function checkRoundEnd(timeUp) {
   else if (timeUp) winner = a > b ? 'A' : b > a ? 'B' : 'tie';
   if (!winner) return;
   if (winner === 'A') S.scoreA++; else if (winner === 'B') S.scoreB++;
+  S.lastWinner = winner;
   S.phase = 'post'; S.phaseEnd = now() + 3.5;
   const txt = winner === 'tie' ? 'EMPATE' : `PONTO ${TEAMS[winner].name}`;
   const sub = timeUp ? `TEMPO ESGOTADO · ${a} × ${b} VIVOS` : winner === 'A' ? 'O TIME AZUL LIMPOU O CAMPO' : winner === 'B' ? 'O TIME VERMELHO LIMPOU O CAMPO' : 'NINGUÉM SOBROU';
@@ -1505,6 +1506,8 @@ function drawMinimap() {
 function updateBody(a, dt) {
   const B = a.body; if (!B) return;
   if (!a.alive) { animateOut(a, dt); return; }
+  if (isDancing(a)) { B.root.position.copy(a.pos); B.root.rotation.y = a.yaw; dancePose(B, a.slot || 0); return; }
+  B.upper.rotation.y = 0; B.upper.rotation.z = 0; B.arms.rotation.z = 0; B.legs.position.x = 0; B.legL.rotation.z = 0; B.legR.rotation.z = 0;
   B.root.position.copy(a.pos);
   B.root.rotation.y = a.yaw;
   const legTop = a.height() - 0.95;
@@ -1580,6 +1583,65 @@ function animateOut(a, dt) {
   if (t > fadeAt + 1 || Math.abs(a.pos.x) > FIELD.hw + 1) B.root.visible = false;
 }
 
+
+// ---------------- passinho da vitória ----------------
+function roundWinner() {
+  if (S.mode === 'online') return net.round && net.round.ph === 'post' ? net.round.win : '';
+  if (S.mode === 'speedball') return S.phase === 'post' ? S.lastWinner : '';
+  return '';
+}
+function isDancing(a) { const w = roundWinner(); return !!w && w !== 'tie' && a.alive && a.team === w; }
+function dancePose(B, seed) {
+  const bpm = 128, t = now() * bpm / 60 * Math.PI + seed * 0.7; // uma batida a cada meio ciclo
+  const step = Math.sin(t), dbl = Math.sin(t * 2);
+  // pés indo e voltando (passinho), joelhos no ritmo
+  B.legs.position.y = -0.04 - Math.abs(dbl) * 0.05;
+  B.legL.rotation.x = 0.25 + step * 0.45; B.legL.userData.knee.rotation.x = -0.5 - Math.max(0, -step) * 0.9;
+  B.legR.rotation.x = 0.25 - step * 0.45; B.legR.userData.knee.rotation.x = -0.5 - Math.max(0, step) * 0.9;
+  B.legL.rotation.z = -0.12 + Math.max(0, step) * 0.25; B.legR.rotation.z = 0.12 - Math.max(0, -step) * 0.25;
+  // quadril balança de lado, tronco gira e quica
+  B.legs.position.x = step * 0.07;
+  B.upper.position.y = 0.8 + Math.abs(dbl) * 0.05;
+  B.upper.rotation.set(0.08 + Math.abs(dbl) * 0.06, step * 0.4, -step * 0.12);
+  // marcador sacudindo de um lado pro outro, cabeça no balanço
+  B.arms.rotation.x = -0.35 + dbl * 0.25;
+  B.arms.rotation.z = step * 0.5;
+  B.head.rotation.x = dbl * 0.22;
+}
+// o seu boneco para você se ver dançando (câmera em terceira pessoa)
+let selfBody = null, danceOrbit = 0, beatAt = 0, beatN = 0;
+function updateSelfDance(dt) {
+  const dancing = player && isDancing(player);
+  if (!dancing) { if (selfBody) selfBody.root.visible = false; return false; }
+  if (!selfBody || selfBody.team !== player.team) {
+    if (selfBody) scene.remove(selfBody.root);
+    selfBody = buildBody(player.team); selfBody.team = player.team; scene.add(selfBody.root);
+  }
+  selfBody.root.visible = true;
+  selfBody.root.position.copy(player.pos); selfBody.root.rotation.y = player.yaw;
+  dancePose(selfBody, 0);
+  danceOrbit += dt * 0.6;
+  // câmera na frente do boneco, balançando de um lado pro outro, sem entrar em bunker
+  const ang = player.yaw + Math.sin(danceOrbit) * 0.9;
+  const head = new V3(player.pos.x, player.pos.y + 1.3, player.pos.z);
+  const goal = new V3(player.pos.x - Math.sin(ang) * 3.1, player.pos.y + 1.45, player.pos.z - Math.cos(ang) * 3.1);
+  const block = worldHit(head, goal);
+  if (block) goal.copy(head).lerp(goal, Math.max(0.25, (block.distance - 0.35) / head.distanceTo(goal)));
+  goal.x = clamp(goal.x, -NET_X + 0.3, NET_X - 0.3); goal.z = clamp(goal.z, -NET_Z + 0.3, NET_Z - 0.3);
+  camera.position.lerp(goal, 1 - Math.pow(0.02, dt));
+  const m = new THREE.Matrix4().lookAt(camera.position, new V3(player.pos.x, player.pos.y + 1.05, player.pos.z), new V3(0, 1, 0));
+  camera.quaternion.slerp(new THREE.Quaternion().setFromRotationMatrix(m), 1 - Math.pow(0.001, dt));
+  vm.visible = false;
+  // batidinha: bumbo, caixa e chimbal
+  const tb = performance.now();
+  if (actx && tb - beatAt > 60000 / 128 / 2) {
+    beatAt = tb; const n = beatN++ % 4;
+    if (n % 2 === 0) tone(62, .16, .5, 'sine', .5); else { noise(1900, .7, .12, .22); tone(190, .06, .15, 'triangle', .6); }
+    noise(8000, 1.5, .03, .06, 'highpass');
+  }
+  return true;
+}
+
 // ---------------- camera ----------------
 // ---------------- morte: seta, killcam e espectador ----------------
 let deathCam = null, specIdx = 0, hitDirUntil = 0, hitDirFrom = null;
@@ -1609,6 +1671,7 @@ function drawHitDir() {
 function mates() { return actors.filter(a => a.alive && !a.isPlayer && a.team === player.team && a.body && a.body.root.visible); }
 function updateCamera(dt) {
   drawHitDir();
+  if (updateSelfDance(dt)) { el('speclabel').hidden = true; return; }
   const lab = el('speclabel');
   if (player.alive) { lab.hidden = true; deathCam = null; }
   if (!player.alive) {
