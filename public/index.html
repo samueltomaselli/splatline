@@ -168,7 +168,7 @@
   <div class="cross" id="cross"><i class="dot"></i><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
   <div class="hitmark" id="hitmark"></div>
   <div class="ammo">
-    <div><div class="n" id="hopper">200</div><div class="lbl">BOLAS NO LOADER</div><div class="reloadbar"><i id="reloadbar"></i></div></div>
+    <div><div class="n" id="hopper">40</div><div class="lbl">BOLAS NO LOADER</div><div class="reloadbar"><i id="reloadbar"></i></div></div>
     <div><div class="pods" id="pods"></div><div class="lbl" style="margin-top:6px">PODS</div></div>
     <div><div class="nades" id="nades"></div><div class="lbl" style="margin-top:6px">GRANADAS · G</div></div>
   </div>
@@ -220,7 +220,7 @@
       <label for="sens">SENSIBILIDADE (ESCALA CS)</label>
       <div class="inline"><input type="range" id="sensRange" min="0.3" max="6" step="0.05" value="2" aria-label="Sensibilidade"><input type="number" id="sens" min="0.1" max="10" step="0.05" value="2"></div>
     </div>
-    <p class="rules" id="rules"><strong>Regras:</strong> partida até 4 pontos. Cada ponto dura até 2 minutos. Vence o time que eliminar todos os adversários, ou, quando o tempo acaba, o que tiver mais jogadores vivos. Loader de 200 bolas e 4 pods de 140.</p>
+    <p class="rules" id="rules"><strong>Regras:</strong> partida até 4 pontos. Cada ponto dura até 2 minutos. Vence o time que eliminar todos os adversários, ou, quando o tempo acaba, o que tiver mais jogadores vivos. Loader de 40 bolas e 3 pods de 40: cada bola conta.</p>
     <p class="warn" id="kickWarn" hidden></p>
     <p class="warn" id="netWarn" hidden></p>
     <p class="warn" id="touchWarn" hidden>Este jogo precisa de teclado e mouse.</p>
@@ -242,6 +242,8 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const FIELD = { hw: 18, hl: 22.5 };
 const HIT_PAD = 0.1;
+// munição: loader de 40 bolas e 3 pods de 40 por vida (no mata-mata os pods não acabam)
+const LOADER = 40, POD = 40, PODS = 3;
 const G = 9.81, BALL_SPEED = 90, DRAG = 0.0035, BREAK_CHANCE = 0.86;
 const WIN_POINTS = 4, ROUND_TIME = 120;
 
@@ -263,7 +265,7 @@ const ONLINE_RESPAWN = 3, ONLINE_SHIELD = 2, ROUND_START_SHIELD = 1;
 const BOT_NAMES = ['TATU', 'BIRA', 'RATO', 'JACA', 'PITBULL', 'ZECA', 'BAIANO', 'GRILO', 'CATITA', 'TOCO'];
 const RULES = {
   online: '<strong>Online:</strong> todo mundo que abrir este link cai na mesma sala. Você entra num dos dois times, sorteado para equilibrar. Speedball por pontos, só gente de verdade: foi eliminado, espera o próximo ponto. Vence o ponto o time que eliminar todos do outro (ou tiver mais gente viva quando os 2 minutos acabam). Enquanto não houver alguém em cada time, é aquecimento livre com respawn.',
-  speedball: '<strong>Regras:</strong> partida até 4 pontos. Cada ponto dura até 2 minutos. Vence o time que eliminar todos os adversários, ou, quando o tempo acaba, o que tiver mais jogadores vivos. Loader de 200 bolas e 4 pods de 140.',
+  speedball: '<strong>Regras:</strong> partida até 4 pontos. Cada ponto dura até 2 minutos. Vence o time que eliminar todos os adversários, ou, quando o tempo acaba, o que tiver mais jogadores vivos. Loader de 40 bolas e 3 pods de 40: cada bola conta.',
   dm: '<strong>Mata-mata:</strong> treino de 5 minutos contra 5 bots, todos atrás de você. Quem é eliminado volta em 2 segundos num ponto aleatório do campo, com 1,5 s de proteção. Pods infinitos. Conta abates, mortes, acertos na máscara e precisão.',
 };
 
@@ -528,7 +530,7 @@ class Actor {
     Object.assign(this, { team, name, isPlayer, slot });
     this.pos = new V3(); this.vel = new V3(); this.yaw = 0; this.pitch = 0;
     this.crouch = 0; this.wantCrouch = false; this.grounded = true;
-    this.alive = true; this.hopper = 200; this.pods = 4; this.reloadEnd = 0; this.nextShot = 0;
+    this.alive = true; this.hopper = LOADER; this.pods = PODS; this.reloadEnd = 0; this.nextShot = 0;
     this.walkPhase = 0; this.outAt = 0;
     if (!isPlayer) { this.body = buildBody(team); scene.add(this.body.root); }
   }
@@ -826,7 +828,7 @@ function respawn(a) {
   const p = S.mode === 'online' ? teamSpawn(a.team) : findSpawn(a);
   a.pos.copy(p); a.vel.set(0, 0, 0);
   a.yaw = S.mode === 'online' ? (a.team === 'A' ? 0 : Math.PI) : Math.atan2(p.x, p.z); a.pitch = 0; a.crouch = 0; a.wantCrouch = false; a.grounded = true;
-  a.alive = true; a.hopper = 200; a.pods = 4; a.reloadEnd = 0; a.pendingPod = false; a.nextShot = 0; a.outAt = 0;
+  a.alive = true; a.hopper = LOADER; a.pods = PODS; a.reloadEnd = 0; a.pendingPod = false; a.nextShot = 0; a.outAt = 0;
   a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
   a.spawnUntil = now() + (S.mode === 'online' ? ONLINE_SHIELD : SPAWN_SHIELD); a.respawnAt = 0;
   if (a.body) {
@@ -863,7 +865,7 @@ function startRound() {
     const sign = a.team === 'A' ? 1 : -1;
     a.pos.set(xs[a.slot] * sign, 0, 21.4 * sign); a.vel.set(0, 0, 0);
     a.yaw = a.team === 'A' ? 0 : Math.PI; a.pitch = 0; a.crouch = 0; a.wantCrouch = false;
-    a.alive = true; a.hopper = 200; a.pods = 4; a.reloadEnd = 0; a.nextShot = 0; a.outAt = 0; a.grounded = true;
+    a.alive = true; a.hopper = LOADER; a.pods = PODS; a.reloadEnd = 0; a.nextShot = 0; a.outAt = 0; a.grounded = true;
     a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
     if (a.body) {
       a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0);
@@ -989,7 +991,7 @@ function botAimAt(b, t, dt, errScale) {
 }
 function botShoot(b, errDeg) {
   if (now() < b.nextShot || b.hopper <= 0 || now() < b.reloadEnd) return;
-  if (b.hopper <= 0 && b.pods > 0) { b.reloadEnd = now() + 2; b.hopper = 140; b.pods--; return; }
+  if (b.hopper <= 0 && b.pods > 0) { b.reloadEnd = now() + 2; b.hopper = POD; b.pods--; return; }
   b.nextShot = now() + 1 / b.cfg.rof * rand(0.85, 1.25);
   b.hopper--;
   const e = errDeg * DEG;
@@ -1010,7 +1012,7 @@ function updateBot(b, dt) {
       if (best !== b.target) { b.target = best; b.reactAt = t + rand(...b.cfg.react) + (S.mode !== 'speedball' ? 0.3 : 0); }
     }
   }
-  if (b.hopper <= 0 && (b.pods > 0 || S.mode !== 'speedball') && t >= b.reloadEnd) { b.reloadEnd = t + 2; b.hopper = 140; if (S.mode === 'speedball') b.pods--; }
+  if (b.hopper <= 0 && (b.pods > 0 || S.mode === 'dm') && t >= b.reloadEnd) { b.reloadEnd = t + 2; b.hopper = POD; if (S.mode !== 'dm') b.pods--; }
 
   let goal = null, speed = 5.2;
   const d = b.cfg;
@@ -1150,13 +1152,13 @@ let slideReq = false, nadeReq = false;
 let kick = 0, emptyWarned = false;
 function reload() {
   const p = player, t = now();
-  if (!p.alive || t < p.reloadEnd || p.pods <= 0 || p.hopper >= 200) return;
+  if (!p.alive || t < p.reloadEnd || (p.pods <= 0 && S.mode !== 'dm') || p.hopper >= LOADER) return;
   p.reloadEnd = t + 1.8; p.reloadStart = t; sfx.dump();
   setTimeout(() => { /* completa no tick */ }, 0);
   p.pendingPod = true;
 }
 function integrate(a, dt) {
-  if (a.pendingPod && now() >= a.reloadEnd) { a.pendingPod = false; a.hopper = Math.min(200, a.hopper + 140); if (S.mode === 'speedball') a.pods--; emptyWarned = false; }
+  if (a.pendingPod && now() >= a.reloadEnd) { a.pendingPod = false; a.hopper = Math.min(LOADER, a.hopper + POD); if (S.mode !== 'dm') a.pods--; emptyWarned = false; }
   a.crouch += ((a.wantCrouch ? 1 : 0) - a.crouch) * Math.min(1, 12 * dt);
   if (!a.grounded) a.vel.y -= 14 * dt;
   a.pos.addScaledVector(a.vel, dt);
@@ -1192,7 +1194,13 @@ const vmParts = {};
   const balls = new THREE.Group(); gun.add(balls); balls.position.set(0, 0.155, -0.07);
   const bm = new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: .3, emissive: 0x3a2a00 });
   const bg = new THREE.SphereGeometry(0.014, 10, 8);
-  for (let i = 0; i < 26; i++) { const b = new THREE.Mesh(bg, bm); const a = i * 2.39996, rr = 0.012 + (i % 9) * 0.006; b.position.set(Math.cos(a) * rr * .75, Math.floor(i / 9) * 0.024 - 0.02, Math.sin(a) * rr * 1.45); b.userData.base = b.position.clone(); balls.add(b); }
+  // 40 bolas em 4 camadas de 10 (de baixo para cima): cada tiro some uma, de cima
+  for (let i = 0; i < 40; i++) {
+    const layer = Math.floor(i / 10), k = i % 10, a = k / 10 * Math.PI * 2 + layer * 0.3, rr = k < 3 ? 0.012 : 0.034;
+    const ang = k < 3 ? k / 3 * Math.PI * 2 : (k - 3) / 7 * Math.PI * 2 + layer * 0.4;
+    const b = new THREE.Mesh(bg, bm); b.position.set(Math.cos(ang) * rr * 1.2, layer * 0.022 - 0.036 + (k < 3 ? 0.004 : 0), Math.sin(ang) * rr * 2.1);
+    b.userData.base = b.position.clone(); balls.add(b);
+  }
   vmParts.balls = balls; vmParts.shell = shell;
   // empunhadura, guarda-mato e gatilho
   const grip = add(new THREE.BoxGeometry(0.045, 0.13, 0.055), rubber, 0, -0.1, -0.02, gun); grip.rotation.x = 0.28;
@@ -1235,7 +1243,7 @@ function animateViewModel(dt) {
   const c = TEAMS[player.team].jersey;
   for (const m of vmParts.sleeves) if (m.color.getHex() !== c) m.color.setHex(c);
   // bolas no loader proporcionais ao que sobrou, com chacoalho a cada tiro
-  const show = Math.round(clamp(player.hopper / 200, 0, 1) * vmParts.balls.children.length);
+  const show = clamp(player.hopper | 0, 0, vmParts.balls.children.length);
   vmParts.balls.children.forEach((b, i) => { b.visible = i < show; const j = kick * 0.006; b.position.set(b.userData.base.x + (Math.random() - .5) * j, b.userData.base.y + (Math.random() - .5) * j, b.userData.base.z + (Math.random() - .5) * j); });
   vmParts.finger.position.z = -0.06 + kick * 0.012;
   // despejo do pod: arma inclina, pod entra no loader
@@ -1296,10 +1304,10 @@ function renderHud() {
   const m = Math.floor(left / 60), s = Math.floor(left % 60);
   el('clock').textContent = S.mode === 'online' ? net.clockText() : `${m}:${String(s).padStart(2, '0')}`; el('clock').classList.toggle('hot', left < 20 && S.phase === 'live');
   if (dm && !player.alive && player.respawnAt) { el('bannerSub').textContent = `VOLTA EM ${Math.max(0, player.respawnAt - now()).toFixed(1)} s`; }
-  el('hopper').textContent = player.hopper; el('hopper').classList.toggle('low', player.hopper < 30);
+  el('hopper').textContent = player.hopper; el('hopper').classList.toggle('low', player.hopper <= 10);
   const nb = el('nades'); if (nb.children.length !== NADES_PER_LIFE) nb.innerHTML = '<i class="nade"></i>'.repeat(NADES_PER_LIFE);
   [...nb.children].forEach((x, i) => x.classList.toggle('used', i >= (player.nades ?? NADES_PER_LIFE)));
-  const pods = el('pods'); if (pods.children.length !== 4) pods.innerHTML = '<i class="pod"></i>'.repeat(4);
+  const pods = el('pods'); if (pods.children.length !== PODS) pods.innerHTML = '<i class="pod"></i>'.repeat(PODS);
   [...pods.children].forEach((p, i) => p.classList.toggle('empty', i >= player.pods));
   const rb = el('reloadbar'); rb.style.width = player.pendingPod ? `${clamp((now() - player.reloadStart) / 1.8, 0, 1) * 100}%` : '0%';
   renderPips();
