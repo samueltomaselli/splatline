@@ -58,6 +58,16 @@
 
   #minimap { position: absolute; left: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); width: 140px; height: 175px; border-radius: 6px; background: rgba(15,21,18,.72); border: 1px solid rgba(199,210,204,.14); }
 
+  .chat { position: absolute; left: 16px; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .chat .log { display: flex; flex-direction: column; gap: 3px; max-height: 190px; overflow: hidden; justify-content: flex-end; }
+  .chat .ln { font: 500 14px/1.35 var(--body); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.9); background: rgba(15,21,18,.45); padding: 3px 8px; border-radius: 4px; align-self: flex-start; max-width: 100%; overflow-wrap: anywhere; transition: opacity .6s; }
+  .chat .ln b { font-weight: 700; margin-right: 6px; }
+  .chat .ln.sys { color: var(--muted); font: 600 12px/1.35 var(--mono); letter-spacing: .03em; }
+  .chat .ln.old { opacity: 0; }
+  .chat.open .ln.old { opacity: .85; }
+  .chat.open .log { background: rgba(15,21,18,.55); border-radius: 6px; padding: 6px; }
+  .chat input { pointer-events: auto; font: 500 14px/1 var(--body); padding: 9px 11px; border-radius: 5px; border: 1px solid var(--yellow); background: rgba(15,21,18,.92); color: #fff; outline: none; }
+  .chat .hint { font: 600 11px/1 var(--mono); color: var(--muted); letter-spacing: .08em; }
   .feed { position: absolute; right: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
   .feed div { font: 600 13px/1 var(--body); background: rgba(15,21,18,.78); padding: 6px 10px; border-radius: 4px; display: flex; gap: 8px; align-items: center; animation: feedIn .18s ease-out; }
   .feed .me { box-shadow: inset 0 0 0 1px var(--yellow); }
@@ -163,7 +173,8 @@
     <div><div class="nades" id="nades"></div><div class="lbl" style="margin-top:6px">GRANADAS · G</div></div>
   </div>
   <div class="callout" id="callout"></div>
-  <div class="keys"><b>WASD</b> mover · <b>SHIFT</b> andar · <b>CTRL/C</b> agachar<br><b>R</b> despejar pod · <b>G</b> granada · <b>C correndo</b> carrinho<br><b>ESPAÇO</b> pular · <b>ESC</b> menu<span id="tabHint"> · <b>TAB</b> placar</span></div>
+  <div class="chat" id="chat" hidden><div class="log" id="chatLog"></div><input id="chatInput" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Mensagem para a sala · Enter envia · Esc fecha" hidden><span class="hint" id="chatHint">ENTER · CHAT</span></div>
+  <div class="keys"><b>WASD</b> mover · <b>SHIFT</b> andar · <b>CTRL/C</b> agachar<br><b>R</b> despejar pod · <b>G</b> granada · <b>C correndo</b> carrinho<br><b>ESPAÇO</b> pular · <b>ESC</b> menu<span id="tabHint"> · <b>TAB</b> placar · <b>ENTER</b> chat</span></div>
   <div class="banner" id="banner" hidden><div class="big" id="bannerBig"></div><div class="sub" id="bannerSub"></div></div>
   <div class="toast" id="toast" hidden></div>
   <div class="board" id="board" hidden></div>
@@ -247,7 +258,7 @@ const NAMES_A = ['VOCÊ', 'TATU', 'BIRA'];
 const NAMES_B = ['RATO', 'JACA', 'PITBULL'];
 const NAMES_DM = ['RATO', 'JACA', 'PITBULL', 'ZECA', 'BAIANO'];
 const DM_TIME = 300, DM_RESPAWN_PLAYER = 2, DM_RESPAWN_BOT = 2.5, SPAWN_SHIELD = 1.5;
-const ONLINE_RESPAWN = 3, ONLINE_SHIELD = 2;
+const ONLINE_RESPAWN = 3, ONLINE_SHIELD = 2, ROUND_START_SHIELD = 1;
 const BOT_NAMES = ['TATU', 'BIRA', 'RATO', 'JACA', 'PITBULL', 'ZECA', 'BAIANO', 'GRILO', 'CATITA', 'TOCO'];
 const RULES = {
   online: '<strong>Online:</strong> todo mundo que abrir este link cai na mesma sala. Você entra num dos dois times, sorteado para equilibrar. Speedball por pontos, só gente de verdade: foi eliminado, espera o próximo ponto. Vence o ponto o time que eliminar todos do outro (ou tiver mais gente viva quando os 2 minutos acabam). Enquanto não houver alguém em cada time, é aquecimento livre com respawn.',
@@ -1419,7 +1430,9 @@ requestAnimationFrame(frame);
 
 // ---------------- input ----------------
 addEventListener('keydown', e => {
+  if (chat.typing()) return; // digitando no chat: o jogo não recebe teclas
   if (S.phase === 'menu' || S.phase === 'over' || S.paused) return;
+  if (S.mode === 'online' && (e.code === 'Enter' || e.code === 'KeyT') && !e.repeat) { e.preventDefault(); keys.clear(); mouseDown = false; chat.open(); return; }
   if (!e.repeat && (e.code === 'KeyC' || e.code === 'ControlLeft')) slideReq = true;
   if (!e.repeat && e.code === 'KeyG') nadeReq = true;
   keys.add(e.code);
@@ -1526,7 +1539,7 @@ const net = {
       respawn(p); p.frozen = true; p.spawnUntil = 0; spectate = false;
       showBanner(`PONTO ${R.n}`, `AZUL ${R.A} × ${R.B} VERMELHO · PREPARE-SE`, 3.8); sfx.beep();
     }
-    if (R.ph === 'live' && this.lastPh !== 'live') { p.frozen = false; if (p.alive) { showBanner('VAI!', 'BREAK — CORRA PARA UM BUNKER', 1); sfx.horn(); } }
+    if (R.ph === 'live' && this.lastPh !== 'live') { p.frozen = false; if (p.alive) { p.spawnUntil = now() + ROUND_START_SHIELD; this.sendPresence(true); showBanner('VAI!', 'BREAK — CORRA PARA UM BUNKER · 1 s DE PROTEÇÃO', 1); sfx.horn(); } }
     if (R.ph === 'post' && this.lastPh !== 'post') {
       p.frozen = false;
       const txt = R.win ? `PONTO ${TEAMS[R.win].name}` : 'EMPATE';
@@ -1539,6 +1552,8 @@ const net = {
     this.lastPh = R.ph;
   },
   start() {
+    chat.reset(); document.getElementById('chat').hidden = false;
+    chat.add(null, 'Você entrou na sala. Enter abre o chat.');
     this.joined = true; this.host = false; this.bots = []; this.seenN = 0; this.lastPh = 'wait';
     for (const B of balls) scene.remove(B.mesh); balls.length = 0;
     for (const b of bunkers) b.occupied = null;
@@ -1557,6 +1572,7 @@ const net = {
   },
   leave() {
     this.joined = false;
+    chat.reset(); document.getElementById('chat').hidden = true;
     if (this.room) this.room.presence({ n: null, t: null, s: null, b: null }).catch(() => {});
     for (const a of actors) if (a.body) scene.remove(a.body.root);
     actors.length = 0; this.remotes.clear(); this.bots = [];
@@ -1685,6 +1701,7 @@ const net = {
   },
   tick(dt) {
     if (!this.joined || !this.room) return;
+    chat.trackPeers();
     if (this.me && player.key !== this.me) player.key = this.me;
     this.electHost();
     if (this.host) this.balanceBots();
@@ -1939,6 +1956,7 @@ function createWsRoom(url) {
   room.on('shot', m => net.onShot(m));
   room.on('nade', m => net.onNade(m));
   room.on('boom', m => net.onBoom(m));
+  room.on('chat', m => chat.onMsg(m));
   room.on('hit', m => net.onHit(m));
   room.on('out', m => net.onOut(m));
   let lostAt = 0;
@@ -1951,6 +1969,69 @@ function createWsRoom(url) {
 })();
 
 document.addEventListener('visibilitychange', () => { if (net.joined) net.sendPresence(true); });
+
+
+// ---------------- chat da sala ----------------
+const chat = {
+  isOpen: false, lastSent: 0, known: new Map(),
+  el: () => document.getElementById('chat'),
+  typing() { return this.isOpen && document.activeElement === document.getElementById('chatInput'); },
+  open() {
+    if (!net.joined) return;
+    this.isOpen = true;
+    const c = this.el(), inp = document.getElementById('chatInput');
+    c.hidden = false; c.classList.add('open'); inp.hidden = false; document.getElementById('chatHint').hidden = true;
+    inp.value = ''; setTimeout(() => inp.focus(), 0);
+  },
+  close() {
+    this.isOpen = false;
+    const c = this.el(), inp = document.getElementById('chatInput');
+    c.classList.remove('open'); inp.hidden = true; inp.blur(); document.getElementById('chatHint').hidden = false;
+  },
+  clean(t) { return String(t || '').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120); },
+  send() {
+    const inp = document.getElementById('chatInput');
+    const text = this.clean(inp.value);
+    this.close();
+    if (!text) return;
+    const t = performance.now();
+    if (t - this.lastSent < 700) { this.add(null, 'Espere um instante para mandar outra mensagem.'); return; }
+    this.lastSent = t;
+    this.add({ name: net.name, team: player.team, me: true }, text);
+    if (net.room) net.room.emit('chat', { n: net.name, t: player.team, m: text }).catch(() => {});
+  },
+  onMsg(msg) {
+    if (msg.sameTab || !net.joined || !msg.data) return;
+    const d = msg.data, text = this.clean(d.m);
+    if (!text) return;
+    this.add({ name: cleanName(d.n) || 'JOGADOR', team: d.t === 'A' || d.t === 'B' ? d.t : null }, text);
+    tone(740, .05, .05, 'sine');
+  },
+  add(who, text) {
+    const c = this.el(); if (!c) return;
+    c.hidden = false;
+    const ln = document.createElement('div'); ln.className = 'ln' + (who ? '' : ' sys');
+    if (who) { const b = document.createElement('b'); b.textContent = who.name + (who.me ? ' (você)' : ''); b.style.color = who.team ? (who.team === 'A' ? '#8fb3ff' : '#ff9ea1') : 'var(--yellow)'; ln.append(b); }
+    ln.append(document.createTextNode(text));
+    const log = document.getElementById('chatLog'); log.append(ln);
+    while (log.children.length > 30) log.firstChild.remove();
+    setTimeout(() => ln.classList.add('old'), 9000);
+  },
+  trackPeers() {
+    const now = new Map();
+    for (const p of net.joinedPeers()) if (!p.sameTab) now.set(p.peer, { n: cleanName(p.presence.n) || 'JOGADOR', t: p.presence.t });
+    for (const [id, v] of now) if (!this.known.has(id)) this.add(null, `${v.n} entrou no time ${TEAMS[v.t] ? TEAMS[v.t].name : ''}`);
+    for (const [id, v] of this.known) if (!now.has(id)) this.add(null, `${v.n} saiu da sala`);
+    this.known = now;
+  },
+  reset() { this.known = new Map(); const log = document.getElementById('chatLog'); if (log) log.textContent = ''; this.close(); },
+};
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); chat.send(); }
+  else if (e.key === 'Escape') { e.preventDefault(); chat.close(); }
+});
+document.getElementById('chatInput').addEventListener('blur', () => { if (chat.isOpen) setTimeout(() => { if (document.activeElement !== document.getElementById('chatInput')) chat.close(); }, 0); });
 
 // nomes acima dos colegas de time
 const tagCanvas = el('tags'), tctx = tagCanvas.getContext('2d');
@@ -2025,6 +2106,7 @@ function resume() {
   if (!lookFallback) requestLock();
 }
 function pause() {
+  if (chat.isOpen) chat.close();
   S.paused = true; keys.clear(); mouseDown = false;
   el('endStats').hidden = true;
   refreshMenu();
