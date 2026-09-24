@@ -88,6 +88,10 @@
   .cross .l, .cross .r { width: 7px; height: 2px; top: -1px; }
   .hitmark { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; opacity: 0; transition: opacity .25s; }
   .hitmark.on { opacity: 1; transition: none; }
+  .hitmark.head::before, .hitmark.head::after { background: var(--yellow); width: 3px; }
+  .hitmark.kill { animation: killpop .26s ease-out; }
+  .hitmark.kill::before, .hitmark.kill::after { background: #ff3b3b; width: 4px; height: 38px; top: -6px; left: 11px; }
+  @keyframes killpop { from { transform: scale(1.7); } to { transform: scale(1); } }
   .hitmark::before, .hitmark::after { content: ""; position: absolute; left: 12px; top: -2px; width: 2px; height: 30px; background: var(--magenta); transform: rotate(45deg); box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
   .hitmark::after { transform: rotate(-45deg); }
 
@@ -503,14 +507,26 @@ function panOf(p) {
   return clamp(_sv.x / Math.max(1.5, Math.hypot(_sv.x, _sv.z)), -1, 1) * 0.9;
 }
 const sfx = {
-  shot: (p, mine) => { const v = mine ? 1 : distVol(p) * .6, pn = mine ? 0 : panOf(p); noise(1800, 1.2, .06, .35 * v, 'bandpass', pn); tone(140, .07, .25 * v, 'triangle', .5, pn); },
+  // "tuc" do marcador: batida grave + estalo + chiado de ar; o seu também chacoalha o loader
+  shot: (p, mine) => {
+    const v = mine ? 1 : distVol(p) * .55, pn = mine ? 0 : panOf(p);
+    tone(96, .1, .38 * v, 'triangle', .42, pn);
+    noise(850, .8, .05, .32 * v, 'lowpass', pn);
+    noise(1500, 1.4, .025, .16 * v, 'bandpass', pn);
+    noise(6200, .5, .17, .11 * v, 'highpass', pn);
+    if (mine) for (let i = 0; i < 3; i++) setTimeout(() => noise(rand(2800, 4200), 3, .018, .045, 'bandpass'), 55 + i * 32 + Math.random() * 12);
+  },
   splat: p => { const v = distVol(p); noise(700, .8, .12, .3 * v, 'lowpass', panOf(p)); },
   step: (p, loud) => { const d = p.distanceTo(camera.position); if (d > 26) return; const v = (1 - d / 26) * loud; noise(rand(320, 620), 1.1, .07, .28 * v, 'lowpass', panOf(p)); noise(rand(1800, 2600), 2, .03, .05 * v, 'bandpass', panOf(p)); },
-  hit: () => { tone(1250, .05, .12, 'square'); tone(1850, .08, .08, 'square'); },
+  hit: head => {
+    if (head) { tone(1960, .22, .13, 'sine'); tone(2940, .16, .07, 'sine'); tone(3920, .1, .04, 'sine'); } // "ding" da máscara
+    else { tone(1300, .04, .1, 'square'); noise(3000, 2, .03, .08); }
+  },
+  kill: () => { noise(160, .7, .14, .35, 'lowpass'); tone(520, .08, .13, 'square'); setTimeout(() => tone(780, .14, .13, 'square'), 70); },
   out: () => { tone(420, .25, .18, 'sawtooth', .5); },
   horn: () => { tone(233, .6, .14, 'sawtooth'); tone(311, .6, .1, 'sawtooth'); },
   beep: () => tone(880, .12, .12, 'square'),
-  dump: () => { noise(2400, .6, .5, .12); },
+  dump: () => { noise(2400, .6, .12, .08); for (let i = 0; i < 16; i++) setTimeout(() => noise(rand(2600, 4600), 3, .02, rand(.03, .07), 'bandpass'), 90 + i * 42 + Math.random() * 30); },
   toss: p => { const v = distVol(p); noise(900, .7, .15, .12 * v, 'bandpass', panOf(p)); },
   bounce: p => { const v = distVol(p); tone(220, .06, .12 * v, 'triangle', .6, panOf(p)); },
   boom: p => { const v = distVol(p), pn = panOf(p); noise(260, .5, .6, .6 * v, 'lowpass', pn); tone(70, .45, .5 * v, 'sine', .4, pn); noise(1600, .8, .35, .25 * v, 'bandpass', pn); },
@@ -712,9 +728,24 @@ function canSee(a, b) {
 const balls = [];
 const ballGeo = new THREE.SphereGeometry(0.05, 8, 6);
 const ballMats = { A: new THREE.MeshBasicMaterial({ color: TEAMS.A.paint }), B: new THREE.MeshBasicMaterial({ color: TEAMS.B.paint }) };
+const trailGeo = new THREE.CylinderGeometry(0.045, 0.004, 1, 6, 1, true); trailGeo.translate(0, -0.5, 0);
+const trailMats = { A: new THREE.MeshBasicMaterial({ color: TEAMS.A.paint, transparent: true, opacity: .6, depthWrite: false }), B: new THREE.MeshBasicMaterial({ color: TEAMS.B.paint, transparent: true, opacity: .6, depthWrite: false }) };
+const _up = new V3(0, 1, 0), _dir = new V3();
+function makeBall(team, pos) {
+  const m = new THREE.Mesh(ballGeo, ballMats[team]); m.position.copy(pos);
+  const tr = new THREE.Mesh(trailGeo, trailMats[team]); tr.scale.set(1, 0.001, 1); tr.renderOrder = 2; m.add(tr);
+  m.userData.trail = tr; m.userData.start = pos.clone();
+  scene.add(m); return m;
+}
+function updateTrail(B) {
+  const tr = B.mesh.userData.trail; if (!tr) return;
+  _dir.copy(B.vel).normalize();
+  tr.quaternion.setFromUnitVectors(_up, _dir);
+  tr.scale.y = Math.min(2.4, B.mesh.position.distanceTo(B.mesh.userData.start));
+}
 function fire(actor, dir) {
   const origin = actor.eye().addScaledVector(dir, 0.45);
-  const m = new THREE.Mesh(ballGeo, ballMats[actor.team]); m.position.copy(origin); scene.add(m);
+  const m = makeBall(actor.team, origin);
   const vel = dir.clone().multiplyScalar(BALL_SPEED * rand(0.97, 1.02));
   balls.push({ pos: origin, vel, owner: actor, team: actor.team, mesh: m, life: 2.5 });
   sfx.shot(origin, actor.isPlayer);
@@ -765,7 +796,7 @@ function updateBalls(dt) {
       scene.remove(B.mesh); balls.splice(i, 1); continue;
     }
     if (B.life <= 0) { scene.remove(B.mesh); balls.splice(i, 1); continue; }
-    B.pos.copy(p1); B.mesh.position.copy(p1);
+    B.pos.copy(p1); B.mesh.position.copy(p1); updateTrail(B);
   }
 }
 
@@ -882,6 +913,7 @@ function botMaybeNade(b) {
   return true;
 }
 function onPlayerElim(part) {
+  hitMarker('kill'); sfx.kill(); shake = Math.max(shake, 1);
   player.streak = (player.streak || 0) + 1;
   const n = player.streak;
   const big = n >= 5 ? 'IMPARÁVEL!' : n === 4 ? 'QUÁDRUPLA!' : n === 3 ? 'TRIPLA!' : n === 2 ? 'DUPLA!' : part === 'head' ? 'NA MÁSCARA!' : part === 'nade' ? 'SPLASH!' : '';
@@ -1017,7 +1049,7 @@ function eliminate(a, by, part) {
 }
 function onActorHit(a, B, part, point, vol) {
   const by = B.owner;
-  if (by.isPlayer) { S.stats.hits++; hitMarker(); sfx.hit(); }
+  if (by.isPlayer) { S.stats.hits++; hitMarker(part === 'head' ? 'head' : 'hit'); sfx.hit(part === 'head'); }
   if (S.mode === 'online' && a.remote) {
     // no online toda bola que acerta quebra: bounce aqui parecia bug
     const n = point.clone().sub(new V3(vol.x, vol.y, vol.z)).normalize();
@@ -1385,7 +1417,14 @@ const el = id => document.getElementById(id);
 let bannerUntil = 0, toastUntil = 0, lastCount = 4;
 function showBanner(big, sub, dur = 999) { el('bannerBig').textContent = big; el('bannerSub').textContent = sub || ''; el('banner').hidden = false; bannerUntil = now() + dur; }
 function toast(msg) { el('toast').textContent = msg; el('toast').hidden = false; toastUntil = performance.now() + 2600; }
-function hitMarker() { const h = el('hitmark'); h.classList.add('on'); setTimeout(() => h.classList.remove('on'), 60); }
+let hmTimer = 0;
+function hitMarker(kind = 'hit') {
+  const h = el('hitmark');
+  if (h.classList.contains('kill') && h.classList.contains('on') && kind !== 'kill') return;
+  h.className = 'hitmark on ' + (kind === 'hit' ? '' : kind);
+  clearTimeout(hmTimer); hmTimer = setTimeout(() => h.classList.remove('on'), kind === 'kill' ? 260 : kind === 'head' ? 140 : 70);
+}
+let shake = 0;
 function flashSplat(color) { const f = el('splatflash'); f.style.background = `radial-gradient(40% 35% at ${rand(35, 65)}% ${rand(35, 60)}%, ${color} 0 55%, transparent 70%)`; f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 50); }
 function addFeed(by, victim, part) {
   const d = document.createElement('div');
@@ -1610,6 +1649,7 @@ function updateCamera(dt) {
     const e = player.eye();
     camera.position.copy(e);
     camera.rotation.set(player.pitch, player.yaw, 0);
+    if (shake > 0.01) { camera.rotation.x += (Math.random() - .5) * shake * 0.035; camera.rotation.y += (Math.random() - .5) * shake * 0.035; shake *= Math.pow(0.004, dt); }
     vm.visible = player.alive;
     const sp = Math.hypot(player.vel.x, player.vel.z);
     bob += sp * dt * 1.8;
@@ -1984,7 +2024,7 @@ const net = {
       const pos = new V3(s[2], s[3], s[4]), vel = new V3(s[5], s[6], s[7]);
       if (vel.length() > 120) continue;
       pos.addScaledVector(vel, 0.03); // compensa um pouco a latência
-      const m = new THREE.Mesh(ballGeo, ballMats[s[1]]); m.position.copy(pos); scene.add(m);
+      const m = makeBall(s[1], pos);
       balls.push({ pos, vel, owner, team: s[1], mesh: m, life: 2.5, remote: true });
       sfx.shot(pos, false);
     }
