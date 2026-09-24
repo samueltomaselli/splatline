@@ -221,6 +221,7 @@
       <div class="inline"><input type="range" id="sensRange" min="0.3" max="6" step="0.05" value="2" aria-label="Sensibilidade"><input type="number" id="sens" min="0.1" max="10" step="0.05" value="2"></div>
     </div>
     <p class="rules" id="rules"><strong>Regras:</strong> partida até 4 pontos. Cada ponto dura até 2 minutos. Vence o time que eliminar todos os adversários, ou, quando o tempo acaba, o que tiver mais jogadores vivos. Loader de 200 bolas e 4 pods de 140.</p>
+    <p class="warn" id="kickWarn" hidden></p>
     <p class="warn" id="netWarn" hidden></p>
     <p class="warn" id="touchWarn" hidden>Este jogo precisa de teclado e mouse.</p>
     <div id="endStats" hidden class="stats"></div>
@@ -1908,6 +1909,7 @@ function createWsRoom(url) {
       else if (m.t === 'event') deliverEvent(m.peer, m.topic, m.data, m.id);
       else if (m.t === 'signal') onSignal(m.from, m.data);
       else if (m.t === 'full') { for (const f of connFns) f(false); }
+      else if (m.t === 'kick') { setTimeout(() => kickForIdle('O servidor tirou você da sala: a aba ficou mais de 1 minuto sem responder (minimizada ou computador em repouso).'), 0); }
     };
     ws.onclose = () => {
       const was = open; open = false; me = null;
@@ -2027,7 +2029,7 @@ const chat = {
   reset() { this.known = new Map(); const log = document.getElementById('chatLog'); if (log) log.textContent = ''; this.close(); },
 };
 document.getElementById('chatInput').addEventListener('keydown', e => {
-  e.stopPropagation();
+  e.stopPropagation(); markActive();
   if (e.key === 'Enter') { e.preventDefault(); chat.send(); }
   else if (e.key === 'Escape') { e.preventDefault(); chat.close(); }
 });
@@ -2054,6 +2056,31 @@ function drawTags() {
 
 // ---------------- menu ----------------
 const menu = el('menu');
+// ---------------- inatividade ----------------
+const IDLE_KICK = 60, IDLE_WARN = 45;
+let lastInput = performance.now(), idleWarned = 0;
+const markActive = () => { lastInput = performance.now(); if (idleWarned) { idleWarned = 0; el('toast').hidden = true; } };
+for (const ev of ['keydown', 'mousedown', 'wheel', 'touchstart']) addEventListener(ev, markActive, { capture: true, passive: true });
+addEventListener('mousemove', e => { if (e.movementX || e.movementY) markActive(); }, { capture: true, passive: true });
+function kickForIdle(reason) {
+  if (!net.joined) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (chat.isOpen) chat.close();
+  net.leave(); S.phase = 'menu'; S.paused = true; keys.clear(); mouseDown = false;
+  el('kickWarn').textContent = reason;
+  el('kickWarn').hidden = false;
+  menu.hidden = false; refreshMenu();
+}
+setInterval(() => {
+  if (!net.joined) { idleWarned = 0; return; }
+  const idle = (performance.now() - lastInput) / 1000;
+  if (idle >= IDLE_KICK) { kickForIdle('Você saiu da sala por ficar 1 minuto parado. Clique em Entrar na sala para voltar.'); return; }
+  if (idle >= IDLE_WARN) {
+    idleWarned = 1;
+    toast(`Parado há ${Math.floor(idle)} s · você sai da sala em ${Math.ceil(IDLE_KICK - idle)} s. Mexa o mouse para continuar.`);
+  }
+}, 1000);
+
 el('mode').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const wasPlaying = S.phase !== 'menu' && S.phase !== 'over';
@@ -2120,6 +2147,7 @@ el('start').addEventListener('click', () => {
       if (!net.room) return;
       net.name = nick; try { localStorage.setItem('splatline.nick', nick); } catch {}
     }
+    el('kickWarn').hidden = true; lastInput = performance.now();
     newMatch();
   }
   resume();
@@ -2175,6 +2203,6 @@ for (let i = 0; i < 70; i++) {
 decals.length = 0; // os decorativos não entram no limite nem são limpos
 S.phase = 'menu';
 // acesso de depuração (o jogo é single-player)
-if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, explodeNade, worldHit };
+if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, explodeNade, worldHit, setIdle: sec => { lastInput = performance.now() - sec * 1000; } };
 })();
 </script>

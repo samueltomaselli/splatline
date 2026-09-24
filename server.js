@@ -10,6 +10,8 @@ const { WebSocketServer } = require('ws');
 
 const PORT = Number(process.env.PORT) || 8080;
 const MAX_PEERS = Number(process.env.MAX_PEERS) || 24;
+// quem está numa partida e fica 1 min sem mandar sinal (aba parada) é removido
+const IDLE_MS = Number(process.env.IDLE_MS) || 60000;
 const MAX_PRESENCE_BYTES = 4096;
 const MAX_EVENT_BYTES = 4096;
 const TOPICS = new Set(['shot', 'hit', 'out', 'nade', 'boom', 'chat']);
@@ -48,7 +50,7 @@ const isPlainObject = v => v !== null && typeof v === 'object' && !Array.isArray
 wss.on('connection', ws => {
   if (peers.size >= MAX_PEERS) { ws.send(JSON.stringify({ t: 'full' })); ws.close(1013, 'sala cheia'); return; }
   const id = crypto.randomBytes(6).toString('hex');
-  const peer = { ws, presence: {}, tokens: 120, last: Date.now(), alive: true };
+  const peer = { ws, presence: {}, tokens: 120, last: Date.now(), alive: true, lastPresence: Date.now() };
   peers.set(id, peer);
   ws.send(JSON.stringify({ t: 'welcome', me: id, peers: [...peers].filter(([pid]) => pid !== id).map(([pid, p]) => ({ peer: pid, presence: p.presence })) }));
   broadcast({ t: 'join', peer: id }, id);
@@ -68,6 +70,7 @@ wss.on('connection', ws => {
       for (const [k, v] of Object.entries(m.patch)) { if (v === null) delete next[k]; else next[k] = v; }
       if (Buffer.byteLength(JSON.stringify(next)) > MAX_PRESENCE_BYTES) return;
       peer.presence = next;
+      peer.lastPresence = Date.now();
       broadcast({ t: 'presence', peer: id, presence: next }, id);
     } else if (m.t === 'event' && TOPICS.has(m.topic)) {
       if (Buffer.byteLength(JSON.stringify(m.data ?? null)) > MAX_EVENT_BYTES) return;
@@ -91,5 +94,18 @@ setInterval(() => {
     p.alive = false; p.ws.ping();
   }
 }, 15000);
+
+// jogador na partida (tem nome) sem mandar presença há IDLE_MS: tira da sala
+setInterval(() => {
+  const t = Date.now();
+  for (const [id, p] of peers) {
+    if (!p.presence || typeof p.presence.n !== 'string') continue;
+    if (t - p.lastPresence < IDLE_MS) continue;
+    try { p.ws.send(JSON.stringify({ t: 'kick', reason: 'idle' })); } catch {}
+    p.presence = {};
+    broadcast({ t: 'presence', peer: id, presence: {} }, id);
+    p.lastPresence = t;
+  }
+}, 5000);
 
 server.listen(PORT, () => console.log(`Splatline rodando em http://localhost:${PORT}`));
