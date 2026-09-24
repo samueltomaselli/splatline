@@ -270,7 +270,8 @@ const RULES = {
 // ---------------- renderer / scene ----------------
 const canvas = $('#game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+let pixelCap = 1.5;
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pixelCap));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
@@ -295,7 +296,7 @@ scene.add(new THREE.HemisphereLight(0xdfeef5, 0x3c5a3a, 0.75));
 const sun = new THREE.DirectionalLight(0xfff3dd, 1.05);
 sun.position.set(-18, 32, 14);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024);
 Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 90 });
 sun.shadow.bias = -0.0006;
 scene.add(sun);
@@ -382,6 +383,7 @@ function splatMat(color, v) {
 }
 const planeGeo = new THREE.PlaneGeometry(1, 1);
 const decals = [];
+const MAX_DECALS = 180;
 function addDecal(point, normal, color, size, parent) {
   const m = new THREE.Mesh(planeGeo, splatMat(color, (Math.random() * 4) | 0));
   m.position.copy(point).addScaledVector(normal, 0.012);
@@ -391,7 +393,7 @@ function addDecal(point, normal, color, size, parent) {
   if (parent) { parent.worldToLocal(m.position); parent.add(m); m.quaternion.premultiply(parent.getWorldQuaternion(new THREE.Quaternion()).invert()); }
   else scene.add(m);
   decals.push(m);
-  if (decals.length > 600) { const old = decals.shift(); old.parent && old.parent.remove(old); }
+  while (decals.length > MAX_DECALS) { const old = decals.shift(); old.parent && old.parent.remove(old); }
   return m;
 }
 
@@ -715,7 +717,7 @@ function explodeNade(pos, team, owner, withDamage) {
   sfx.boom(pos);
   // respingos voando
   const mat = ballMats[team];
-  for (let i = 0; i < 46; i++) {
+  for (let i = 0; i < 22; i++) {
     const m = new THREE.Mesh(dropGeo, mat); m.position.copy(pos); m.scale.setScalar(rand(0.5, 1.4)); scene.add(m);
     const a = Math.random() * Math.PI * 2, up = rand(1.5, 7), out = rand(3, 9);
     drops.push({ mesh: m, vel: new V3(Math.cos(a) * out, up, Math.sin(a) * out), life: rand(0.6, 1.4), color });
@@ -1306,7 +1308,7 @@ function renderHud() {
   el('cross').hidden = !player.alive;
   if (bannerUntil && now() > bannerUntil) { el('banner').hidden = true; bannerUntil = 0; }
   if (!el('toast').hidden && performance.now() > toastUntil) el('toast').hidden = true;
-  drawMinimap();
+  if (performance.now() - (renderHud.mm || 0) > 100) { renderHud.mm = performance.now(); drawMinimap(); }
 }
 const mm = el('minimap'), mctx = mm.getContext('2d');
 function drawMinimap() {
@@ -1386,8 +1388,23 @@ function updateCamera(dt) {
 
 // ---------------- loop ----------------
 let last = performance.now();
+const perf = { frames: 0, since: performance.now(), low: 0 };
+function autoQuality() {
+  perf.frames++;
+  const t = performance.now(), el = t - perf.since;
+  if (el < 1000) return;
+  const fps = perf.frames * 1000 / el; perf.frames = 0; perf.since = t;
+  if (document.hidden || S.phase === 'menu') return;
+  perf.low = fps < 45 ? perf.low + 1 : 0;
+  if (perf.low >= 3 && pixelCap > 0.75) {
+    pixelCap = Math.max(0.75, +(pixelCap - 0.25).toFixed(2)); perf.low = 0;
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pixelCap)); resize();
+    if (pixelCap <= 1 && renderer.shadowMap.enabled && fps < 35) { renderer.shadowMap.enabled = false; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+  }
+}
 function frame(ts) {
   requestAnimationFrame(frame);
+  autoQuality();
   let dt = Math.min(0.05, (ts - last) / 1000); last = ts;
   if ((!S.paused || S.mode === 'online') && S.phase !== 'menu' && S.phase !== 'over') step(dt);
   drawTags();
