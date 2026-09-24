@@ -948,7 +948,7 @@ function respawn(a) {
   a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
   a.spawnUntil = now() + (S.mode === 'online' ? ONLINE_SHIELD : SPAWN_SHIELD); a.respawnAt = 0;
   if (a.body) {
-    a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0); a.body.arms.rotation.set(0, 0, 0); a.body.upper.rotation.set(0, 0, 0);
+    resetBodyLook(a); a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0); a.body.arms.rotation.set(0, 0, 0); a.body.upper.rotation.set(0, 0, 0);
     const stale = []; a.body.root.traverse(o => { if (o.userData.paint) stale.push(o); });
     for (const o of stale) o.parent.remove(o);
     initBot(a);
@@ -984,7 +984,7 @@ function startRound() {
     a.alive = true; a.hopper = LOADER; a.pods = PODS; a.reloadEnd = 0; a.nextShot = 0; a.outAt = 0; a.grounded = true;
     a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
     if (a.body) {
-      a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0);
+      resetBodyLook(a); a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0);
       const stale = []; a.body.root.traverse(o => { if (o.userData.paint) stale.push(o); });
       for (const o of stale) o.parent.remove(o);
       initBot(a);
@@ -1023,6 +1023,7 @@ function onActorHit(a, B, part, point, vol) {
     const n = point.clone().sub(new V3(vol.x, vol.y, vol.z)).normalize();
     const d = addDecal(point, n, TEAMS[B.team].paint, part === 'head' ? 0.22 : 0.3, a.body.root); d.userData.paint = true;
     sfx.splat(point);
+    splashBurst(point, B.team);
     a.pendingOut = now() + 1.2; // não conta de novo enquanto a vítima confirma
     net.emitHit(a, by, part, point);
     return;
@@ -1032,7 +1033,7 @@ function onActorHit(a, B, part, point, vol) {
     const n = point.clone().sub(new V3(vol.x, vol.y, vol.z)).normalize();
     if (brk) { const d = addDecal(point, n, TEAMS[B.team].paint, part === 'head' ? 0.22 : 0.3, a.body.root); d.userData.paint = true; }
   } else if (!brk) { toast('BOUNCE! A bola não quebrou.'); }
-  if (brk) { sfx.splat(point); if (S.mode === 'online') net.emitOut(a, B, part, point); eliminate(a, by, part); }
+  if (brk) { sfx.splat(point); splashBurst(point, B.team); if (S.mode === 'online') net.emitOut(a, B, part, point); eliminate(a, by, part); }
   else if (by.isPlayer) toast('Bounce — a bola bateu e não quebrou.');
 }
 function aliveCount(t) { return actors.filter(a => a.team === t && a.alive).length; }
@@ -1464,15 +1465,7 @@ function drawMinimap() {
 // ---------------- bots render ----------------
 function updateBody(a, dt) {
   const B = a.body; if (!B) return;
-  if (!a.alive) {
-    const k = clamp((now() - a.outAt) / 1.4, 0, 1);
-    B.arms.rotation.x = -1.4 * Math.min(1, k * 3);
-    // sai do campo com o marcador pro alto
-    if (k >= 1 && S.mode !== 'speedball') { B.root.visible = false; return; }
-    if (k >= 1) { const dir = Math.sign(a.pos.x || 1); a.pos.x += dir * 2 * dt; B.root.position.copy(a.pos); if (Math.abs(a.pos.x) > FIELD.hw + 0.8) B.root.visible = false; }
-    B.legL.rotation.x = Math.sin(now() * 7) * 0.4 * (k >= 1 ? 1 : 0); B.legR.rotation.x = -B.legL.rotation.x;
-    return;
-  }
+  if (!a.alive) { animateOut(a, dt); return; }
   B.root.position.copy(a.pos);
   B.root.rotation.y = a.yaw;
   const legTop = a.height() - 0.95;
@@ -1492,6 +1485,60 @@ function updateBody(a, dt) {
   B.upper.rotation.x = lean;
   B.arms.rotation.x = a.pitch - lean;
   B.head.rotation.x = (a.pitch - lean) * 0.5;
+}
+
+
+// ---------------- eliminação: tranco, "tô fora" com a arma pra cima, sai andando e some ----------------
+const OUT_RAISE = 0.35, OUT_WALK = 1.5, OUT_FADE = 4.6, OUT_GONE = 5.6;
+function setBodyOpacity(a, o) {
+  a.body.root.traverse(m => {
+    if (!m.isMesh || m.userData.paint) return;
+    if (!m.userData.baseMat) { m.userData.baseMat = m.material; m.material = m.material.clone(); m.material.transparent = true; }
+    m.material.opacity = o; m.material.depthWrite = o > 0.6;
+  });
+}
+function resetBodyLook(a) {
+  if (!a.body) return;
+  a.body.root.traverse(m => { if (m.isMesh && m.userData.baseMat) { m.material.dispose(); m.material = m.userData.baseMat; m.userData.baseMat = null; } });
+  a.body.upper.rotation.set(0, 0, 0); a.body.arms.rotation.set(0, 0, 0); a.body.head.rotation.set(0, 0, 0);
+  a.outDir = null;
+}
+function splashBurst(point, team, n = 10) {
+  const mat = ballMats[team];
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(dropGeo, mat); m.position.copy(point); m.scale.setScalar(rand(0.35, 0.8)); scene.add(m);
+    const a = Math.random() * Math.PI * 2;
+    drops.push({ mesh: m, vel: new V3(Math.cos(a) * rand(1, 3), rand(0.5, 2.5), Math.sin(a) * rand(1, 3)), life: rand(0.4, 0.8), color: TEAMS[team].paint });
+  }
+}
+function animateOut(a, dt) {
+  const B = a.body, t = now() - a.outAt;
+  B.root.visible = true;
+  // direção de saída: lateral mais próxima
+  if (!a.outDir) { a.outDir = Math.sign(a.pos.x || (Math.random() - .5)) || 1; a.outYaw0 = a.yaw; }
+  const walkYaw = a.outDir > 0 ? -Math.PI / 2 : Math.PI / 2; // anda para +x ou -x
+  let raise, lean = 0, walk = 0;
+  if (t < OUT_RAISE) { const k = t / OUT_RAISE; lean = Math.sin(k * Math.PI) * 0.35; raise = k * 0.6; }
+  else if (t < OUT_WALK) { raise = Math.min(1, 0.6 + (t - OUT_RAISE) * 1.5); }
+  else { raise = 1; walk = 1; }
+  // arma para cima (sinal de eliminado) e tronco ereto
+  B.arms.rotation.x = -1.55 * raise;
+  B.upper.rotation.x = lean; B.head.rotation.x = -0.2 * raise;
+  B.upper.position.y = 0.85;
+  B.legs.position.y = 0;
+  // vira e anda até a lateral
+  if (walk) {
+    const dy = Math.atan2(Math.sin(walkYaw - a.yaw), Math.cos(walkYaw - a.yaw));
+    a.yaw += clamp(dy, -6 * dt, 6 * dt);
+    if (Math.abs(dy) < 0.6) { a.pos.x += a.outDir * 1.9 * dt; a.walkPhase += 1.9 * dt * 2.2; }
+  }
+  const sw = walk ? Math.sin(a.walkPhase) * 0.45 : 0;
+  for (const [leg, s] of [[B.legL, sw], [B.legR, -sw]]) { leg.rotation.x = s; leg.userData.knee.rotation.x = -Math.max(0, -s) * 1.2; }
+  B.root.position.copy(a.pos); B.root.rotation.y = a.yaw;
+  // some aos poucos (no speedball ele termina de sair do campo)
+  const fadeAt = S.mode === 'speedball' ? OUT_FADE + 1.5 : OUT_FADE;
+  if (t > fadeAt) setBodyOpacity(a, clamp(1 - (t - fadeAt), 0, 1));
+  if (t > fadeAt + 1 || Math.abs(a.pos.x) > FIELD.hw + 1) B.root.visible = false;
 }
 
 // ---------------- camera ----------------
@@ -1841,7 +1888,7 @@ const net = {
     a.target.set(st.x, st.y, st.z); a.tYaw = st.yaw; a.tPitch = st.pitch; a.tCrouch = st.crouch; a.shield = st.shield;
     if (st.alive && !a.alive && performance.now() > (a.deadLock || 0)) { // voltou (respawn)
       a.alive = true; a.pos.copy(a.target); a.yaw = a.tYaw; a.outAt = 0;
-      a.body.root.visible = true; a.body.arms.rotation.set(0, 0, 0);
+      resetBodyLook(a); a.body.root.visible = true; a.body.arms.rotation.set(0, 0, 0);
       const stale = []; a.body.root.traverse(o => { if (o.userData.paint) stale.push(o); }); for (const o of stale) o.parent.remove(o);
     } else if (!st.alive && a.alive) { a.alive = false; a.outAt = now(); }
   },
@@ -1873,6 +1920,7 @@ const net = {
       const before = a.pos.clone();
       const ahead = Math.min(0.12, (performance.now() - (a.tAt || 0)) / 1000);
       const goal = a.tVel ? a.target.clone().addScaledVector(a.tVel, ahead) : a.target;
+      if (!a.alive) continue; // eliminado: a animação de saída controla a posição
       if (a.pos.distanceTo(goal) > 4) a.pos.copy(goal); else a.pos.lerp(goal, k);
       a.vel.copy(a.pos).sub(before).divideScalar(Math.max(dt, 1e-3));
       a.yaw += Math.atan2(Math.sin(a.tYaw - a.yaw), Math.cos(a.tYaw - a.yaw)) * k;
@@ -2402,7 +2450,7 @@ function endMatch() {
 // cena de fundo no menu: câmera sobre o campo
 function setupMenuScene() {
   const mode = S.mode; S.mode = 'speedball'; setupActors(); S.mode = mode;
-  for (const a of actors) { const s = a.team === 'A' ? 1 : -1; a.pos.set([0, -4.5, 4.5][a.slot] * s, 0, 21.4 * s); a.yaw = a.team === 'A' ? 0 : Math.PI; a.alive = true; if (a.body) { a.body.root.visible = true; updateBody(a, 0); } }
+  for (const a of actors) { const s = a.team === 'A' ? 1 : -1; a.pos.set([0, -4.5, 4.5][a.slot] * s, 0, 21.4 * s); a.yaw = a.team === 'A' ? 0 : Math.PI; a.alive = true; if (a.body) { resetBodyLook(a); a.body.root.visible = true; updateBody(a, 0); } }
   camera.position.set(-14, 9, 27); camera.lookAt(0, 0, 0); vm.visible = false;
   el('hud').hidden = true;
 }
@@ -2419,6 +2467,6 @@ for (let i = 0; i < 70; i++) {
 decals.length = 0; // os decorativos não entram no limite nem são limpos
 S.phase = 'menu';
 // acesso de depuração (o jogo é single-player)
-if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, explodeNade, worldHit, setIdle: sec => { lastInput = performance.now() - sec * 1000; } };
+if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, explodeNade, worldHit, eliminate, splashBurst, setIdle: sec => { lastInput = performance.now() - sec * 1000; } };
 })();
 </script>
