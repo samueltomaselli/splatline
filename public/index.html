@@ -186,7 +186,7 @@
   <div class="hitdir" id="hitdir"><i></i></div>
   <div class="speclabel" id="speclabel" hidden></div>
   <div class="chat" id="chat" hidden><div class="log" id="chatLog"></div><input id="chatInput" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Mensagem para a sala · Enter envia · Esc fecha" hidden><span class="hint" id="chatHint">ENTER · CHAT</span></div>
-  <div class="keys"><b>WASD</b> mover · <b>SHIFT</b> andar · <b>CTRL/C</b> agachar<br><b>R</b> despejar pod · <b>G</b> granada · <b>C correndo</b> carrinho<br><b>ESPAÇO</b> pular · <b>ESC</b> menu<span id="tabHint"> · <b>TAB</b> placar · <b>ENTER</b> chat</span></div>
+  <div class="keys"><b>WASD</b> mover · <b>SHIFT</b> andar · <b>CTRL/C</b> agachar<br><b>R</b> despejar pod · <b>G</b> granada · <b>C correndo</b> carrinho<br><b>J</b> passinho · <b>ESPAÇO</b> pular · <b>ESC</b> menu<span id="tabHint"> · <b>TAB</b> placar · <b>ENTER</b> chat</span></div>
   <div class="banner" id="banner" hidden><div class="big" id="bannerBig"></div><div class="sub" id="bannerSub"></div></div>
   <div class="toast" id="toast" hidden></div>
   <div class="board" id="board" hidden></div>
@@ -205,6 +205,7 @@
         <span><b>WASD</b> mover</span><span><b>Ctrl / C</b> agachar</span>
         <span><b>Shift</b> andar</span><span><b>R</b> despejar pod</span>
         <span><b>G</b> granada de tinta</span><span><b>C</b> correndo: carrinho</span>
+        <span><b>J</b> passinho</span>
       </div>
     </div>
     <div class="controls">
@@ -977,7 +978,7 @@ function respawn(a) {
   a.pos.copy(p); a.vel.set(0, 0, 0);
   a.yaw = S.mode === 'online' ? (a.team === 'A' ? 0 : Math.PI) : Math.atan2(p.x, p.z); a.pitch = 0; a.crouch = 0; a.wantCrouch = false; a.grounded = true;
   a.alive = true; a.hopper = LOADER; a.pods = PODS; a.reloadEnd = 0; a.pendingPod = false; a.nextShot = 0; a.outAt = 0;
-  a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
+  a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0; a.emote = false;
   a.spawnUntil = now() + (S.mode === 'online' ? ONLINE_SHIELD : SPAWN_SHIELD); a.respawnAt = 0;
   if (a.body) {
     resetBodyLook(a); a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0); a.body.arms.rotation.set(0, 0, 0); a.body.upper.rotation.set(0, 0, 0);
@@ -1014,7 +1015,7 @@ function startRound() {
     a.pos.set(xs[a.slot] * sign, 0, 21.4 * sign); a.vel.set(0, 0, 0);
     a.yaw = a.team === 'A' ? 0 : Math.PI; a.pitch = 0; a.crouch = 0; a.wantCrouch = false;
     a.alive = true; a.hopper = LOADER; a.pods = PODS; a.reloadEnd = 0; a.nextShot = 0; a.outAt = 0; a.grounded = true;
-    a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0;
+    a.nades = a.isPlayer ? NADES_PER_LIFE : 1; a.slideUntil = 0; a.streak = 0; a.emote = false;
     if (a.body) {
       resetBodyLook(a); a.body.root.visible = true; a.body.root.rotation.set(0, 0, 0);
       const stale = []; a.body.root.traverse(o => { if (o.userData.paint) stale.push(o); });
@@ -1029,6 +1030,7 @@ function startRound() {
 }
 
 function eliminate(a, by, part) {
+  a.emote = false;
   a.alive = false; a.outAt = now();
   if (a.bunker) { a.bunker.occupied = null; a.bunker = null; }
   addFeed(by, a, part);
@@ -1241,6 +1243,7 @@ function updatePlayer(dt) {
   const p = player, t = now();
   if (S.paused) { p.vel.x *= 0.8; p.vel.z *= 0.8; p.wantCrouch = false; }
   if (!p.alive || S.paused) return;
+  if (isDancing(p)) { p.vel.x = 0; p.vel.z = 0; p.wantCrouch = false; slideReq = nadeReq = false; triggerAt = -1; return; }
   const canMove = (S.phase === 'live' || S.phase === 'post') && !p.frozen;
   p.wantCrouch = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyC');
   const f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
@@ -1471,7 +1474,7 @@ function renderHud() {
   renderPips();
   const gap = 4 + playerDispersion() * 5;
   const c = el('cross').children; c[1].style.top = `${-gap - 7}px`; c[2].style.top = `${gap}px`; c[3].style.left = `${-gap - 7}px`; c[4].style.left = `${gap}px`;
-  el('cross').hidden = !player.alive;
+  el('cross').hidden = !player.alive || isDancing(player);
   if (bannerUntil && now() > bannerUntil) { el('banner').hidden = true; bannerUntil = 0; }
   if (!el('toast').hidden && performance.now() > toastUntil) el('toast').hidden = true;
   if (performance.now() - (renderHud.mm || 0) > 100) { renderHud.mm = performance.now(); drawMinimap(); }
@@ -1590,7 +1593,21 @@ function roundWinner() {
   if (S.mode === 'speedball') return S.phase === 'post' ? S.lastWinner : '';
   return '';
 }
-function isDancing(a) { const w = roundWinner(); return !!w && w !== 'tie' && a.alive && a.team === w; }
+function isDancing(a) {
+  if (!a || !a.alive) return false;
+  if (a.emote) return true;
+  const w = roundWinner(); return !!w && w !== 'tie' && a.team === w;
+}
+// J: passinho quando quiser (parado; J de novo ou clique para parar)
+function toggleEmote(force) {
+  if (!player || !player.alive || S.paused) return;
+  const on = force === undefined ? !player.emote : force;
+  if (on === !!player.emote) return;
+  player.emote = on;
+  if (on) { player.vel.x = player.vel.z = 0; toast('Passinho! J ou clique para parar.'); }
+  else if (!isDancing(player)) { el('toast').hidden = true; }
+  if (S.mode === 'online') net.sendPresence(true);
+}
 function dancePose(B, seed) {
   const bpm = 128, t = now() * bpm / 60 * Math.PI + seed * 0.7; // uma batida a cada meio ciclo
   const step = Math.sin(t), dbl = Math.sin(t * 2);
@@ -1801,6 +1818,7 @@ addEventListener('keydown', e => {
   if (S.mode === 'online' && (e.code === 'Enter' || e.code === 'KeyT') && !e.repeat) { e.preventDefault(); keys.clear(); mouseDown = false; chat.open(); return; }
   if (!e.repeat && (e.code === 'KeyC' || e.code === 'ControlLeft')) slideReq = true;
   if (!e.repeat && e.code === 'KeyG') nadeReq = true;
+  if (!e.repeat && e.code === 'KeyJ') { toggleEmote(); return; }
   keys.add(e.code);
   if (e.code === 'Tab') e.preventDefault();
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyC'].includes(e.code) || e.ctrlKey) e.preventDefault();
@@ -1812,6 +1830,7 @@ canvas.addEventListener('mousedown', e => {
   if (S.paused) return;
   audioInit();
   if (e.button === 0 && player && !player.alive) { specIdx++; return; }
+  if (e.button === 0 && player && player.emote) { toggleEmote(false); return; }
   if (e.button === 0) { mouseDown = true; triggerAt = now(); }
   if (e.button === 2) dragLook = true;
   if (!locked && !lookFallback) requestLock();
@@ -1961,7 +1980,7 @@ const net = {
     const p = player;
     const patch = {
       n: this.name, t: p.team,
-      s: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), r2(p.crouch), p.alive ? 1 : 0, S.stats.elims, S.stats.outs, p.spawnUntil > now() ? 1 : 0, Math.floor(performance.now() / 250) % 100000, r2(p.vel.x), r2(p.vel.z)],
+      s: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), r2(p.crouch), p.alive ? 1 : 0, S.stats.elims, S.stats.outs, p.spawnUntil > now() ? 1 : 0, Math.floor(performance.now() / 250) % 100000, r2(p.vel.x), r2(p.vel.z), p.emote ? 1 : 0],
       away: document.hidden ? 1 : null,
       r: this.host ? [this.round.n, this.round.ph, Math.round(Math.max(0, this.round.end - performance.now())), this.round.A, this.round.B, this.round.win || ''] : null,
       b: false && this.host ? this.bots.map(b => [b.botId, b.team, b.name, r2(b.pos.x), r2(b.pos.y), r2(b.pos.z), r2(b.yaw), r2(b.pitch), r2(b.crouch), b.alive ? 1 : 0, b.kills || 0]) : null,
@@ -1988,7 +2007,7 @@ const net = {
     a.name = name; a.kills = st.k; a.deaths = st.d; a.seen = true;
     if (!a.tVel) a.tVel = new V3();
     if (st.raw !== a.lastRaw) { a.lastRaw = st.raw; a.tAt = performance.now(); a.tVel.set(st.vx || 0, 0, st.vz || 0); }
-    a.target.set(st.x, st.y, st.z); a.tYaw = st.yaw; a.tPitch = st.pitch; a.tCrouch = st.crouch; a.shield = st.shield;
+    a.target.set(st.x, st.y, st.z); a.tYaw = st.yaw; a.tPitch = st.pitch; a.tCrouch = st.crouch; a.shield = st.shield; a.emote = !!st.emote;
     if (st.alive && !a.alive && performance.now() > (a.deadLock || 0)) { // voltou (respawn)
       a.alive = true; a.pos.copy(a.target); a.yaw = a.tYaw; a.outAt = 0;
       resetBodyLook(a); a.body.root.visible = true; a.body.arms.rotation.set(0, 0, 0);
@@ -2008,7 +2027,7 @@ const net = {
         else if (performance.now() - prev.at > 3000) continue; // travado: aba pausada ou conexão ruim
       }
       if (s && s.length >= 9 && s.slice(0, 6).every(Number.isFinite)) {
-        this.upsertRemote(p.peer, pr.t, cleanName(pr.n) || 'JOGADOR', { x: s[0], y: s[1], z: s[2], yaw: s[3], pitch: s[4], crouch: clamp(s[5], 0, 1), alive: !!s[6], k: s[7] | 0, d: s[8] | 0, shield: !!s[9], vx: Number.isFinite(s[11]) ? clamp(s[11], -12, 12) : 0, vz: Number.isFinite(s[12]) ? clamp(s[12], -12, 12) : 0, raw: s }, false);
+        this.upsertRemote(p.peer, pr.t, cleanName(pr.n) || 'JOGADOR', { x: s[0], y: s[1], z: s[2], yaw: s[3], pitch: s[4], crouch: clamp(s[5], 0, 1), alive: !!s[6], k: s[7] | 0, d: s[8] | 0, shield: !!s[9], vx: Number.isFinite(s[11]) ? clamp(s[11], -12, 12) : 0, vz: Number.isFinite(s[12]) ? clamp(s[12], -12, 12) : 0, emote: s[13] === 1, raw: s }, false);
       }
       if (false && Array.isArray(pr.b)) for (const b of pr.b.slice(0, 12)) {
         if (!Array.isArray(b) || b.length < 11 || (b[1] !== 'A' && b[1] !== 'B') || !b.slice(3, 9).every(Number.isFinite)) continue;
