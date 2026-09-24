@@ -1639,12 +1639,21 @@ function updateSelfDance(dt) {
   dancePose(selfBody, 0);
   danceOrbit += dt * 0.6;
   // câmera na frente do boneco, balançando de um lado pro outro, sem entrar em bunker
-  const ang = player.yaw + Math.sin(danceOrbit) * 0.9;
+  // tenta na frente; se um bunker tapar, usa o lado com mais espaço (atrás ou dos lados)
   const head = new V3(player.pos.x, player.pos.y + 1.3, player.pos.z);
-  const goal = new V3(player.pos.x - Math.sin(ang) * 3.1, player.pos.y + 1.45, player.pos.z - Math.cos(ang) * 3.1);
-  const block = worldHit(head, goal);
-  if (block) goal.copy(head).lerp(goal, Math.max(0.25, (block.distance - 0.35) / head.distanceTo(goal)));
-  goal.x = clamp(goal.x, -NET_X + 0.3, NET_X - 0.3); goal.z = clamp(goal.z, -NET_Z + 0.3, NET_Z - 0.3);
+  const sw = Math.sin(danceOrbit) * 0.9;
+  let goal = null, bestFree = -1;
+  for (const off of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
+    const ang = player.yaw + off + sw;
+    const cand = new V3(player.pos.x - Math.sin(ang) * 3.1, player.pos.y + 1.45, player.pos.z - Math.cos(ang) * 3.1);
+    cand.x = clamp(cand.x, -NET_X + 0.3, NET_X - 0.3); cand.z = clamp(cand.z, -NET_Z + 0.3, NET_Z - 0.3);
+    const full = head.distanceTo(cand), hit = worldHit(head, cand);
+    const free = hit ? Math.max(0, hit.distance - 0.35) : full;
+    if (free > bestFree + 0.3) { bestFree = free; goal = full > 1e-3 ? cand.clone().sub(head).multiplyScalar(Math.min(1, free / full)).add(head) : cand; }
+    if (!hit && full > 2.5) break;
+  }
+  if (bestFree < 1.2) goal.y += 1.2 - bestFree; // sem espaço nenhum: sobe a câmera
+  if (![camera.position.x, camera.position.y, camera.position.z].every(Number.isFinite)) camera.position.copy(goal);
   camera.position.lerp(goal, 1 - Math.pow(0.02, dt));
   const m = new THREE.Matrix4().lookAt(camera.position, new V3(player.pos.x, player.pos.y + 1.05, player.pos.z), new V3(0, 1, 0));
   camera.quaternion.slerp(new THREE.Quaternion().setFromRotationMatrix(m), 1 - Math.pow(0.001, dt));
@@ -2589,6 +2598,6 @@ for (let i = 0; i < 70; i++) {
 decals.length = 0; // os decorativos não entram no limite nem são limpos
 S.phase = 'menu';
 // acesso de depuração (o jogo é single-player)
-if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, explodeNade, worldHit, eliminate, splashBurst, setIdle: sec => { lastInput = performance.now() - sec * 1000; } };
+if (new URLSearchParams(location.search).has('debug')) window.__splat = { net, S, get actors() { return actors; }, get player() { return player; }, step, newMatch, bunkers, nades, get net() { return net; }, get camera() { return camera; }, get selfBody() { return selfBody; }, updateSelfDance, explodeNade, worldHit, eliminate, splashBurst, setIdle: sec => { lastInput = performance.now() - sec * 1000; } };
 })();
 </script>
